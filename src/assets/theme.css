@@ -1,0 +1,450 @@
+/* ============================================================
+   EasyMD 主题令牌 —— 严格复刻 Obsidian 默认主题（暗色/亮色）
+   所有界面颜色/字号/圆角一律取自本文件变量，禁止硬编码色值
+   ============================================================ */
+
+:root {
+  /* 字体：与 Obsidian 一致的系统栈（Windows 上落到 Segoe UI Variable） */
+  --font-ui: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui,
+    -apple-system, "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --font-text: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui,
+    -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New",
+    monospace;
+
+  /* 字号（Obsidian 默认：UI 13px，正文 16px） */
+  --font-scale: 0.925;
+  --font-ui-size: calc(13px * var(--font-scale));
+  --font-ui-smaller: calc(11px * var(--font-scale));
+  --font-ui-medium: calc(15px * var(--font-scale));
+  --font-text-size: calc(16px * var(--font-scale));
+
+  /* 圆角 */
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --radius-l: 12px;
+  --radius-xl: 16px;
+
+  /* 尺寸 */
+  --ribbon-width: 64px;
+  --titlebar-height: 40px;
+  --statusbar-height: 24px;
+  --input-height: 30px;
+  --list-item-height: 26px;
+
+  /* 动效（克制的微反馈，cubic-bezier 自定义；仅 transform/opacity，不触发重排） */
+  --anim-cb: cubic-bezier(0.33, 0.66, 0.5, 1);
+  --anim-fast: 120ms cubic-bezier(0.33, 0.66, 0.5, 1);
+  --anim-medium: 240ms cubic-bezier(0.33, 0.66, 0.5, 1);
+
+  /* 图谱默认色（视图内可被覆盖） */
+  --graph-node: #a882ff;
+  --graph-line: rgba(255, 255, 255, 0.14);
+  --graph-text: #b3b3b3;
+}
+
+/* ---------- 暗色（Obsidian 默认） ---------- */
+[data-theme="dark"] {
+  --background-primary: #1e1e1e;
+  --background-primary-alt: #262626;
+  --background-secondary: #161616;
+  --background-secondary-alt: #1c1c1c;
+  --titlebar-background: var(--background-secondary);
+  --titlebar-background-focused: var(--background-secondary-alt);
+
+  --background-modifier-border: #333333;
+  --background-modifier-border-hover: #3f3f3f;
+  --background-modifier-hover: rgba(255, 255, 255, 0.075);
+  --background-modifier-active-hover: rgba(255, 255, 255, 0.1);
+  --background-modifier-border-focus: #4d4d4d;
+
+  --text-normal: #dcddde;
+  --text-muted: #999999;
+  --text-faint: #666666;
+  --text-on-accent: #f2f2f2;
+  --text-error: #e93147;
+  --text-success: #4aa662;
+
+  --interactive-normal: #2a2a2a;
+  --interactive-hover: #363636;
+  --interactive-accent: #8b6cef;
+  --interactive-accent-hover: #9877f4;
+  --interactive-accent-hover-alt: rgba(139, 108, 239, 0.25);
+
+  --text-accent: #8b6cef;
+  --text-accent-hover: #a48cfa;
+  --link-color: #a882ff;
+  --link-color-hover: #b39bf9;
+  --link-unresolved-color: #9f6b6b;
+  --link-unresolved-opacity: 0.9;
+
+  --hr-color: #333333;
+  --blockquote-border-color: #4a4a4a;
+  --code-background: rgba(255, 255, 255, 0.055);
+  --code-normal: #e9e9e9;
+  --tag-background: rgba(255, 255, 255, 0.08);
+  --tag-color: #b8b8b8;
+  --tag-background-hover: rgba(255, 255, 255, 0.14);
+
+  --scrollbar-thumb: #3f3f3f;
+  --scrollbar-thumb-hover: #525252;
+  --selection-background: rgba(255, 255, 255, 0.14);
+
+  --shadow-l1: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-l2: 0 10px 28px rgba(0, 0, 0, 0.55);
+
+  --graph-node: #a882ff;
+  --graph-line: rgba(255, 255, 255, 0.14);
+  --graph-text: #b3b3b3;
+}
+
+/* ---------- 亮色（Obsidian 默认） ---------- */
+[data-theme="light"] {
+  --background-primary: #ffffff;
+  --background-primary-alt: #f2f3f5;
+  --background-secondary: #f6f6f6;
+  --background-secondary-alt: #ececec;
+  --titlebar-background: var(--background-secondary);
+  --titlebar-background-focused: var(--background-secondary-alt);
+
+  --background-modifier-border: #dbdbdc;
+  --background-modifier-border-hover: #c4c4c6;
+  --background-modifier-hover: rgba(0, 0, 0, 0.045);
+  --background-modifier-active-hover: rgba(0, 0, 0, 0.075);
+  --background-modifier-border-focus: #b5b5b7;
+
+  --text-normal: #222222;
+  --text-muted: #666666;
+  --text-faint: #999999;
+  --text-on-accent: #f2f2f2;
+  --text-error: #e93147;
+  --text-success: #3c9a52;
+
+  --interactive-normal: #ececec;
+  --interactive-hover: #e0e0e0;
+  --interactive-accent: #8b6cef;
+  --interactive-accent-hover: #7d5ee6;
+  --interactive-accent-hover-alt: rgba(139, 108, 239, 0.18);
+
+  --text-accent: #8b6cef;
+  --text-accent-hover: #7a5bd6;
+  --link-color: #705dcf;
+  --link-color-hover: #4f3ec0;
+  --link-unresolved-color: #a05252;
+  --link-unresolved-opacity: 0.9;
+
+  --hr-color: #d8d8d8;
+  --blockquote-border-color: #cfcfcf;
+  --code-background: rgba(0, 0, 0, 0.045);
+  --code-normal: #3a3a3a;
+  --tag-background: rgba(0, 0, 0, 0.055);
+  --tag-color: #5a5a5a;
+  --tag-background-hover: rgba(0, 0, 0, 0.1);
+
+  --scrollbar-thumb: #c9c9c9;
+  --scrollbar-thumb-hover: #adadad;
+  --selection-background: rgba(0, 0, 0, 0.14);
+
+  --shadow-l1: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --shadow-l2: 0 10px 28px rgba(0, 0, 0, 0.16);
+
+  --graph-node: #705dcf;
+  --graph-line: rgba(0, 0, 0, 0.14);
+  --graph-text: #6e6e6e;
+}
+
+/* ---------- 基础重置与元素样式 ---------- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--font-ui-size);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+::selection {
+  background: var(--selection-background);
+}
+
+input,
+textarea,
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* 滚动条（Obsidian 式细滚动条） */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*:hover > ::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+/* 通用控件 */
+input[type="text"],
+input[type="search"],
+textarea.emd-input {
+  background: var(--background-modifier-form-field, var(--background-primary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  height: var(--input-height);
+  padding: 0 8px;
+  width: 100%;
+  transition: border-color var(--anim-fast);
+}
+input[type="text"]:focus,
+input[type="search"]:focus,
+textarea.emd-input:focus {
+  border-color: var(--interactive-accent);
+}
+
+/* 按钮体系（Obsidian 风格） */
+.emd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--input-height);
+  padding: 0 14px;
+  border-radius: var(--radius-s);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  transition: background var(--anim-fast);
+  white-space: nowrap;
+}
+.emd-btn:hover {
+  background: var(--interactive-hover);
+}
+.emd-btn.emd-btn-accent {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.emd-btn.emd-btn-accent:hover {
+  background: var(--interactive-accent-hover);
+}
+
+/* 面板标题（Obsidian 侧栏小节标题） */
+.emd-panel-header {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 树形列表条目 */
+.emd-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--list-item-height);
+  padding: 0 6px;
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background var(--anim-fast);
+}
+.emd-tree-item:hover {
+  background: var(--background-modifier-hover);
+}
+.emd-tree-item.is-active {
+  background: var(--background-modifier-active-hover);
+  color: var(--text-normal);
+}
+
+/* ---------- Vue 过渡动画（全 app 复用；GPU 合成友好） ---------- */
+/* 下拉/气泡：淡入 + 轻微下移 */
+.emd-pop-enter-active,
+.emd-pop-leave-active {
+  transition: opacity 130ms var(--anim-cb), transform 130ms var(--anim-cb);
+}
+.emd-pop-enter-from,
+.emd-pop-leave-to {
+  opacity: 0;
+}
+.emd-pop-enter-from {
+  transform: translateY(-5px) scale(0.985);
+}
+.emd-pop-leave-to {
+  transform: translateY(-2px);
+}
+
+/* 模态遮罩：淡入淡出，内容轻微缩放 */
+.emd-fade-enter-active,
+.emd-fade-leave-active {
+  transition: opacity 150ms var(--anim-cb);
+}
+.emd-fade-enter-active .emd-modal,
+.emd-fade-leave-active .emd-modal {
+  transition: transform 170ms var(--anim-cb);
+}
+.emd-fade-enter-from,
+.emd-fade-leave-to {
+  opacity: 0;
+}
+.emd-fade-enter-from .emd-modal {
+  transform: translateY(10px) scale(0.97);
+}
+.emd-fade-leave-to .emd-modal {
+  transform: translateY(4px) scale(0.985);
+}
+
+/* 侧栏滑入滑出 */
+.emd-side-l-enter-active,
+.emd-side-l-leave-active,
+.emd-side-r-enter-active,
+.emd-side-r-leave-active {
+  transition: opacity 150ms var(--anim-cb), transform 150ms var(--anim-cb);
+}
+.emd-side-l-enter-from,
+.emd-side-l-leave-to,
+.emd-side-r-enter-from,
+.emd-side-r-leave-to {
+  opacity: 0;
+}
+.emd-side-l-enter-from,
+.emd-side-l-leave-to {
+  transform: translateX(-12px);
+}
+.emd-side-r-enter-from,
+.emd-side-r-leave-to {
+  transform: translateX(12px);
+}
+
+/* 主视图切换（编辑 ↔ 图谱 ↔ 画布 ↔ 日历）：淡入 + 轻微上浮；离场更短保证切得快 */
+.emd-view-enter-active {
+  transition: opacity 130ms var(--anim-cb), transform 130ms var(--anim-cb);
+}
+.emd-view-leave-active {
+  transition: opacity 90ms var(--anim-cb);
+}
+.emd-view-enter-from {
+  opacity: 0;
+  transform: translateY(6px) scale(0.996);
+}
+.emd-view-leave-to {
+  opacity: 0;
+}
+
+/* 面板内切页（设置页等）：轻淡入 + 上浮 */
+.emd-pane-enter-active {
+  transition: opacity 130ms var(--anim-cb), transform 130ms var(--anim-cb);
+}
+.emd-pane-leave-active {
+  transition: opacity 80ms var(--anim-cb);
+}
+.emd-pane-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.emd-pane-leave-to {
+  opacity: 0;
+}
+
+/* 主题切换：View Transitions 全窗口 crossfade（一次合成器快照，无逐元素过渡开销） */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: var(--anim-cb);
+}
+
+/* 拖拽调宽时禁用一切过渡，保证 100% 跟手 */
+body.is-col-resizing * {
+  transition: none !important;
+}
+
+/* 无障碍：用户系统要求减少动效时关闭动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* 拖拽调宽时的全局光标（分栏/分屏分隔条） */
+body.is-col-resizing,
+body.is-col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* 打印导出：仅显示打印层 */
+#print-root {
+  display: none;
+}
+@media print {
+  body > *:not(#print-root) {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+  }
+}
+
+/* 模态框（Obsidian 弹窗） */
+.emd-modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.emd-modal {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l2);
+  width: 560px;
+  max-width: 92vw;
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

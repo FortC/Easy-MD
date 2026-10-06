@@ -1,0 +1,8 @@
+pub mod ai;
+pub mod fsops;
+pub mod index_cmd;
+pub mod mcp_cmd;
+pub mod os_open;
+pub mod search;
+pub mod settings;
+pub mod vault;

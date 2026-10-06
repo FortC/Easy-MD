@@ -1,0 +1,234 @@
+<template>
+  <div class="file-explorer" @contextmenu.prevent="showMenu($event, null)">
+    <div class="fe-tree">
+      <FileTree dir="" @menu="showMenu" @open="openNoteFile" />
+    </div>
+
+    <!-- 右键菜单（通用下拉组件） -->
+    <DropdownMenu
+      :open="menu.visible"
+      :x="menu.x"
+      :y="menu.y"
+      :items="menuItems"
+      @select="onMenuSelect"
+      @close="menu.visible = false"
+    />
+
+    <InputDialog
+      v-if="dialog.mode === 'folder'"
+      :title="tf('fe.newFolderIn', { dir: dialog.parent || t('fe.rootDir') })"
+      @confirm="confirmNewFolder"
+      @cancel="dialog.mode = 'none'"
+    />
+    <InputDialog
+      v-if="dialog.mode === 'rename'"
+      :title="t('fe.rename')"
+      :initial="dialog.entry?.name"
+      @confirm="confirmRename"
+      @cancel="dialog.mode = 'none'"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, onUnmounted, reactive } from "vue";
+import Icon from "../common/Icon.vue";
+import InputDialog from "../common/InputDialog.vue";
+import DropdownMenu, { type DropItem } from "../common/DropdownMenu.vue";
+import FileTree from "./FileTree.vue";
+import { useVaultStore } from "../../stores/vault";
+import { useEditorStore } from "../../stores/editor";
+import { useNotesIndexStore } from "../../stores/notesIndex";
+import { useUiStore } from "../../stores/ui";
+import { api } from "../../ipc/tauri";
+import { t, tf } from "../../i18n";
+import type { FsEntry } from "../../types";
+
+const vault = useVaultStore();
+const editor = useEditorStore();
+const indexStore = useNotesIndexStore();
+const ui = useUiStore();
+
+const multiSelected = ref(new Set<string>());
+
+const menu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  entry: null as FsEntry | null,
+});
+
+const dialog = reactive({
+  mode: "none" as "none" | "folder" | "rename",
+  parent: null as string | null,
+  entry: null as FsEntry | null,
+});
+
+/** 菜单项根据右键目标动态生成 */
+const menuItems = computed(() => {
+  const e = menu.entry;
+  if (!e) {
+    return [
+      { key: "new-note", label: t("fe.newNote"), icon: "file-plus" },
+      { key: "new-canvas", label: t("fe.newCanvas"), icon: "layout-grid" },
+      { key: "new-folder", label: t("fe.newFolder"), icon: "folder-plus" },
+      { key: "sep-i", label: "", separator: true },
+      { key: "import", label: t("fe.import"), icon: "download" },
+    ];
+  }
+  if (e.is_dir) {
+    return [
+      { key: "new-note", label: t("fe.newNote"), icon: "file-plus" },
+      { key: "new-canvas", label: t("fe.newCanvas"), icon: "layout-grid" },
+      { key: "new-folder", label: t("fe.newFolder"), icon: "folder-plus" },
+      { key: "sep-i", label: "", separator: true },
+      { key: "import", label: t("fe.import"), icon: "download" },
+      { key: "sep", label: "", separator: true },
+      { key: "delete", label: t("fe.delete"), icon: "trash-2", danger: true },
+    ];
+  }
+  const items: DropItem[] = [
+    { key: "rename", label: t("fe.rename"), icon: "pencil" },
+    { key: "duplicate", label: t("fe.duplicate"), icon: "copy" },
+    { key: "sep", label: "", separator: true },
+    { key: "delete", label: t("fe.delete"), icon: "trash-2", danger: true },
+  ];
+});
+
+const closeMenu = () => (menu.visible = false);
+onMounted(() => {
+  window.addEventListener("pointerdown", closeMenu);
+  window.addEventListener("emd-multi-select-changed", ((e: CustomEvent<Set<string>>) => {
+    multiSelected.value = e.detail;
+  }) as EventListener);
+});
+onUnmounted(() => window.removeEventListener("pointerdown", closeMenu));
+
+function showMenu(ev: MouseEvent, entry: FsEntry | null) {
+  menu.x = ev.clientX;
+  menu.y = ev.clientY;
+  menu.entry = entry;
+  menu.visible = true;
+}
+
+async function onMenuSelect(key: string) {
+  menu.visible = false;
+  const e = menu.entry;
+  switch (key) {
+    case "new-note":
+      ui.openNewNote(e?.is_dir ? e.path : parentOf(e));
+      break;
+    case "new-canvas":
+      vault.newCanvas(e?.is_dir ? e.path : parentOf(e));
+      break;
+    case "new-folder":
+      openFolderDialog(e?.is_dir ? e.path : parentOf(e));
+      break;
+    case "import":
+      importHere(e?.is_dir ? e.path : parentOf(e));
+      break;
+    case "duplicate":
+      if (e) {
+        try { await api.duplicateFile(e.path); await vault.refreshParents(e.path); await indexStore.rebuild(); } catch (err) { alert(String(err)); }
+      }
+      break;
+    case "batchDelete":
+      if (multiSelected.value.size > 0) {
+        if (!confirm(`Delete ${multiSelected.value.size} files?`)) return;
+        try {
+          await api.deleteFiles(Array.from(multiSelected.value));
+          for (const p of multiSelected.value) await vault.refreshParents(p);
+          multiSelected.value = new Set();
+          await indexStore.rebuild();
+        } catch (err) { alert(String(err)); }
+      }
+      break;
+    case "rename":
+      dialog.mode = "rename";
+      dialog.entry = e;
+      break;
+    case "delete":
+      deleteEntry(e);
+      break;
+  }
+}
+
+function openFolderDialog(parent: string | null) {
+  dialog.mode = "folder";
+  dialog.parent = parent;
+}
+
+function openNewFolderDialog() {
+  openFolderDialog(null);
+}
+
+/** 导入外部 md/图片等文件到当前库根目录 */
+async function importHere(folder?: string | null) {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const files = await open({
+    multiple: true,
+    filters: [{ name: t("fe.importFilter"), extensions: ["md", "markdown", "canvas", "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"] }],
+  });
+  if (!files || (Array.isArray(files) && files.length === 0)) return;
+  const paths = Array.isArray(files) ? files : [files];
+  try {
+    const imported = await api.importFiles(paths, folder ?? null);
+    for (const rel of imported) await vault.refreshParents(rel);
+    await vault.refreshDir("");
+    await indexStore.rebuild();
+  } catch (e) {
+    alert(`${t("fe.importFail")}: ${e}`);
+  }
+}
+
+async function openNoteFile(path: string) {
+  await editor.openNote(path);
+}
+
+function parentOf(entry: FsEntry | null): string | null {
+  if (!entry) return null;
+  const parts = entry.path.split("/");
+  parts.pop();
+  return parts.length ? parts.join("/") : null;
+}
+
+async function confirmNewFolder(name: string) {
+  dialog.mode = "none";
+  await api.createFolder(dialog.parent, name);
+  await vault.refreshDir(dialog.parent || "");
+}
+
+async function confirmRename(name: string) {
+  const entry = dialog.entry;
+  dialog.mode = "none";
+  if (!entry) return;
+  const newPath = await api.renamePath(entry.path, name);
+  // 修正编辑器与树
+  if (editor.activePath === entry.path) editor.renameSelf(newPath);
+  await vault.refreshParents(newPath);
+  await indexStore.rebuild();
+}
+
+async function deleteEntry(e: FsEntry | null) {
+  if (!e) return;
+  if (!confirm(`${tf("fe.confirmDel", { name: e.name })}`)) return;
+  await api.deletePath(e.path);
+  if (editor.activePath === e.path) editor.reset();
+  await vault.refreshParents(e.path);
+  await indexStore.rebuild();
+}
+</script>
+
+<style scoped>
+.file-explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.fe-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+}
+</style>

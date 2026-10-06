@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "file",
+      "file": "欢迎.md",
+      "x": -420,
+      "y": -160,
+      "width": 340,
+      "height": 240
+    },
+    {
+      "id": "n2",
+      "type": "text",
+      "text": "# 画布\n\n`.canvas` 文件与笔记一起存放在库里，**Obsidian 兼容格式**。\n\n拖拽卡片、拉出连线，把白板变成思考的画纸。",
+      "x": -20,
+      "y": -320,
+      "width": 360,
+      "height": 220
+    },
+    {
+      "id": "n3",
+      "type": "file",
+      "file": "双向链接.md",
+      "x": -20,
+      "y": -40,
+      "width": 340,
+      "height": 240
+    },
+    {
+      "id": "n4",
+      "type": "file",
+      "file": "知识图谱.md",
+      "x": 380,
+      "y": -40,
+      "width": 340,
+      "height": 240
+    },
+    {
+      "id": "n5",
+      "type": "text",
+      "text": "双击笔记卡片 → 直接编辑 → **直写源 md 文件**",
+      "x": 380,
+      "y": -320,
+      "width": 340,
+      "height": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "n1",
+      "fromSide": "right",
+      "toNode": "n2",
+      "toSide": "left"
+    },
+    {
+      "id": "e2",
+      "fromNode": "n1",
+      "fromSide": "bottom",
+      "toNode": "n3",
+      "toSide": "left"
+    },
+    {
+      "id": "e3",
+      "fromNode": "n3",
+      "fromSide": "right",
+      "toNode": "n4",
+      "toSide": "left"
+    },
+    {
+      "id": "e4",
+      "fromNode": "n2",
+      "fromSide": "right",
+      "toNode": "n5",
+      "toSide": "left"
+    }
+  ]
+}
