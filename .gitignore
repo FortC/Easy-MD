@@ -6,3 +6,5 @@ src-tauri/gen/schemas
 *.local
 .DS_Store
 *.bak
+
+.easy-publish.json
