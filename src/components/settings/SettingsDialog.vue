@@ -139,6 +139,11 @@
         <div v-if="tab === 'mcp'" key="mcp" class="st-pane">
           <McpSettings />
         </div>
+
+        <!-- 关于 -->
+        <div v-if="tab === 'about'" key="about" class="st-pane">
+          <AboutPane />
+        </div>
         </transition>
       </div>
     </div>
@@ -152,6 +157,7 @@ import Icon from "../common/Icon.vue";
 import McpSettings from "./McpSettings.vue";
 import TemplatePane from "./TemplatePane.vue";
 import AiPane from "./AiPane.vue";
+import AboutPane from "./AboutPane.vue";
 import { useUiStore } from "../../stores/ui";
 import { useSettingsStore } from "../../stores/settings";
 import { useNotesIndexStore } from "../../stores/notesIndex";
@@ -182,6 +188,7 @@ const tabs = computed(() => [
   { key: "ai", label: t("st.ai") },
   { key: "appearance", label: t("st.appearance") },
   { key: "mcp", label: t("st.mcp") },
+  { key: "about", label: t("st.about") },
 ]);
 
 onMounted(async () => {

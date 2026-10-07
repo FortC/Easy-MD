@@ -33,5 +33,9 @@
     "typescript": "~5.8.0",
     "vite": "^6.0.0",
     "vue-tsc": "^2.2.0"
+  },
+  "author": {
+    "name": "clb",
+    "email": "lamthebest@foxmail.com"
   }
 }
