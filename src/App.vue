@@ -242,7 +242,8 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKeydown));
 onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 
-// 关窗前把未保存内容落盘（编辑器自动保存有 400ms 防抖窗口，直接关窗会丢最后的输入）
+// 关窗前把未保存内容落盘（编辑器自动保存有 400ms 防抖窗口，直接关窗会丢最后的输入）。
+// 注意：preventDefault 之后必须自行 destroy，任何一步失败都要兜底销毁窗口，否则关不掉。
 let unlistenClose: (() => void) | null = null;
 onMounted(async () => {
   const win = getCurrentWindow();
@@ -251,8 +252,13 @@ onMounted(async () => {
       ev.preventDefault();
       try {
         await editor.save();
-      } finally {
+      } catch (e) {
+        console.error("关窗前保存失败：", e);
+      }
+      try {
         await win.destroy();
+      } catch (e) {
+        console.error("窗口销毁失败：", e);
       }
     }
   });

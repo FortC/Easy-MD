@@ -17,8 +17,8 @@
       </span>
       <span class="sb-item">{{ tf("sb.words", { n: editor.wordCount }) }}</span>
       <span class="sb-item">{{ modeLabel }}</span>
-      <span class="sb-item sb-ver" :title="`EasyMD v${APP_VERSION} ${BUILD_ID}`">
-        v{{ APP_VERSION }} · {{ BUILD_ID }}
+      <span class="sb-item sb-ver" :title="`EasyMD v${appVersion} ${BUILD_ID}`">
+        v{{ appVersion }} · {{ BUILD_ID }}
       </span>
     </div>
   </div>
@@ -26,18 +26,21 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { getVersion } from "@tauri-apps/api/app";
 import Icon from "./Icon.vue";
 import { useEditorStore } from "../../stores/editor";
 import { useNotesIndexStore } from "../../stores/notesIndex";
 import { useSyncStore } from "../../stores/sync";
 import { api } from "../../ipc/tauri";
-import { APP_VERSION, BUILD_ID } from "../../build";
+import { BUILD_ID, APP_VERSION } from "../../build";
 import { t, tf } from "../../i18n";
 
 const editor = useEditorStore();
 const indexStore = useNotesIndexStore();
 const sync = useSyncStore();
 const backlinkCount = ref(0);
+// 运行时读 tauri.conf.json 的版本号（build.ts 的静态常量仅作兜底）
+const appVersion = ref(APP_VERSION);
 
 const modeLabel = computed(
   () =>
@@ -47,6 +50,11 @@ const modeLabel = computed(
 );
 
 onMounted(async () => {
+  try {
+    appVersion.value = await getVersion();
+  } catch {
+    /* 保持 build.ts 兜底值 */
+  }
   // 反链数跟随当前笔记变化刷新
   const refresh = async () => {
     if (!editor.activePath) {
