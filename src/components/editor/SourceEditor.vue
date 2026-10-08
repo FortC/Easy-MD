@@ -29,7 +29,6 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { autocompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
-import { api } from "../../ipc/tauri";
 import { useEditorStore } from "../../stores/editor";
 import { useNotesIndexStore } from "../../stores/notesIndex";
 import { useAiStore } from "../../stores/ai";
@@ -368,33 +367,8 @@ function tagCompletion(ctx: CompletionContext) {
   };
 }
 
-// ---- 粘贴图片 → 附件目录 ----
-const pasteHandler = EditorView.domEventHandlers({
-  paste(event, v) {
-    const items = event.clipboardData?.items;
-    if (!items) return false;
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (!file) continue;
-        event.preventDefault();
-        const ext = (file.name.split(".").pop() || "png").toLowerCase();
-        file.arrayBuffer().then(async (buf) => {
-          const rel = await api.saveImage(Array.from(new Uint8Array(buf)), ext);
-          v.dispatch({
-            changes: {
-              from: v.state.selection.main.head,
-              // <> 包裹：文件名带空格（Pasted image ….png）时裸目标不是合法链接语法
-              insert: `![](<${rel}>)`,
-            },
-          });
-        });
-        return true;
-      }
-    }
-    return false;
-  },
-});
+// 图片粘贴处理已上移到 EditorPane 容器层（capture）：
+// 这里依赖 CodeMirror 实例，await 保存图片期间组件销毁/重建会导致插入静默丢失
 
 function makeState(): EditorState {
   return EditorState.create({
@@ -417,7 +391,6 @@ function makeState(): EditorState {
             noteCompletion(ctx) ?? tagCompletion(ctx),
         ],
       }),
-      pasteHandler,
       EditorView.lineWrapping,
       EditorView.theme({
         "&": { height: "100%", fontSize: "var(--font-text-size)" },

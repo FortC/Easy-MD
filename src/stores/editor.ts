@@ -47,6 +47,20 @@ export const useEditorStore = defineStore("editor", {
       this.content = c;
       this.scheduleSave();
     },
+    /**
+     * 插入文本到当前笔记（图片粘贴/模板等异步流程统一入口）。
+     * 源码/分屏模式经窗口事件交给 CodeMirror 在光标处插入；若编辑器未挂载
+     * 或刚被销毁（切笔记/切模式瞬间），兜底追加到笔记末尾，保证内容不丢。
+     */
+    insertText(text: string) {
+      if (!this.activePath) return;
+      const before = this.content;
+      window.dispatchEvent(new CustomEvent("emd-insert-text", { detail: text }));
+      if (this.content === before) {
+        const sep = this.content && !this.content.endsWith("\n") ? "\n" : "";
+        this.setContent(this.content + sep + text + "\n");
+      }
+    },
     scheduleSave() {
       if (this._saveTimer) clearTimeout(this._saveTimer);
       this._saveTimer = setTimeout(() => this.save(), 400);

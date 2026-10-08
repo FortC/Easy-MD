@@ -199,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Icon from "../common/Icon.vue";
 import DropdownMenu, { type DropItem } from "../common/DropdownMenu.vue";
 import SourceEditor from "./SourceEditor.vue";
@@ -449,6 +449,40 @@ async function onJump(target: { path?: string; anchor?: string; line?: number })
     line: target.line,
   });
 }
+
+// ---- 图片粘贴：容器层统一处理（capture，任何模式/焦点位置都生效） ----
+// 不放在 CodeMirror 里：保存图片的 await 期间组件可能因切模式/切笔记被销毁，
+// 旧实现 dispatch 到已销毁的 view 会静默丢失插入内容（图片入库但语法没进笔记）。
+function onBodyPaste(ev: ClipboardEvent) {
+  if (!editor.isOpen) return;
+  const items = ev.clipboardData?.items;
+  if (!items) return;
+  for (const item of Array.from(items)) {
+    if (!item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (!file) continue;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    file.arrayBuffer()
+      .then(async (buf) => {
+        const rel = await api.saveImage(Array.from(new Uint8Array(buf)), ext);
+        // 阅读模式下看不到源码，切到分屏让用户立即看到图片
+        if (editor.mode === "preview") editor.setMode("split");
+        // <> 包裹：文件名带空格（Pasted image ….png）时裸目标不是合法链接语法
+        editor.insertText(`![](<${rel}>)`);
+      })
+      .catch((e) => console.error("粘贴图片失败：", e));
+    return;
+  }
+}
+
+onMounted(() => {
+  bodyEl.value?.addEventListener("paste", onBodyPaste, true);
+});
+onUnmounted(() => {
+  bodyEl.value?.removeEventListener("paste", onBodyPaste, true);
+});
 </script>
 
 <style scoped>

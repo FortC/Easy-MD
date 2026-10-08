@@ -67,6 +67,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import VaultPicker from "./views/VaultPicker.vue";
 import Workspace from "./views/Workspace.vue";
 import { t } from "./i18n";
@@ -240,6 +241,23 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
 onUnmounted(() => window.removeEventListener("keydown", onKeydown));
+
+// 关窗前把未保存内容落盘（编辑器自动保存有 400ms 防抖窗口，直接关窗会丢最后的输入）
+let unlistenClose: (() => void) | null = null;
+onMounted(async () => {
+  const win = getCurrentWindow();
+  unlistenClose = await win.onCloseRequested(async (ev) => {
+    if (editor.isDirty) {
+      ev.preventDefault();
+      try {
+        await editor.save();
+      } finally {
+        await win.destroy();
+      }
+    }
+  });
+});
+onUnmounted(() => unlistenClose?.());
 
 /** 应用启用的 CSS 片段（配置目录 snippets/*.css → 注入 <style>） */
 async function applyCssSnippets() {
