@@ -1,6 +1,7 @@
 // Tauri IPC 类型化封装：前端唯一的后端入口
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emdAssetUrl } from "../lib/markdown/renderer";
 import type {
   AppSettings,
   Backlink,
@@ -121,5 +122,5 @@ export const api = {
 
 /** vault 内资源 → emdasset URL（Rust 端校验只读 vault 内文件） */
 export function assetUrl(relPath: string): string {
-  return `emdasset://vault/${encodeURIComponent(relPath)}`;
+  return emdAssetUrl(relPath);
 }

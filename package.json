@@ -1,7 +1,7 @@
 {
   "name": "easymd",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -37,5 +37,8 @@
   "author": {
     "name": "clb",
     "email": "lamthebest@foxmail.com"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }

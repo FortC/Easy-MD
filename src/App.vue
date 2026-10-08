@@ -54,6 +54,11 @@
           </button>
         </div>
 
+        <label class="oc-remember">
+          <input type="checkbox" v-model="openChoice.remember" />
+          {{ t("oc.remember") }}
+        </label>
+
         <button class="oc-cancel" @click="doOpen('cancel')">{{ t("c.cancel") }}</button>
       </div>
     </div>
@@ -143,21 +148,32 @@ const openChoice = ref<{
   visible: boolean;
   path: string;
   fileName: string;
-}>({ visible: false, path: "", fileName: "" });
+  remember: boolean;
+}>({ visible: false, path: "", fileName: "", remember: false });
 
-/** 打开磁盘上的 md/canvas：显示选择弹窗 */
+/** 打开磁盘上的 md/canvas：已设默认方式直接执行，否则显示选择弹窗 */
 function openOsFile(abs: string) {
+  const mode = settings.data.os_open_mode;
+  if (mode === "vault" || mode === "temp") {
+    doOpen(mode);
+    return;
+  }
   const fileName = abs.replace(/\\/g, "/").split("/").pop() || t("oc.file");
-  openChoice.value = { visible: true, path: abs, fileName };
+  openChoice.value = { visible: true, path: abs, fileName, remember: false };
 }
 
 /** 用户选择后执行 */
 async function doOpen(mode: "vault" | "temp" | "cancel") {
   const abs = openChoice.value.path;
+  const remember = openChoice.value.remember;
   openChoice.value.visible = false;
   if (mode === "cancel") {
     await fallbackOpen();
     return;
+  }
+  if (remember) {
+    settings.data.os_open_mode = mode;
+    await settings.persist();
   }
   try {
     const res =
@@ -377,5 +393,20 @@ async function applyCssSnippets() {
 }
 .oc-cancel:hover {
   color: var(--text-normal);
+}
+.oc-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.oc-remember input {
+  accent-color: var(--interactive-accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
 }
 </style>

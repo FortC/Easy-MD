@@ -86,6 +86,14 @@
             </button>
             <span v-if="rebuilt" class="st-ok">{{ tf("st.rebuilt", { n: count }) }}</span>
           </div>
+          <div class="st-row">
+            <label>{{ t("st.osOpen") }}</label>
+            <select v-model="settings.data.os_open_mode" class="st-select" @change="persist">
+              <option value="ask">{{ t("st.osAsk") }}</option>
+              <option value="vault">{{ t("st.osVault") }}</option>
+              <option value="temp">{{ t("st.osTemp") }}</option>
+            </select>
+          </div>
           <div class="st-row st-actions-row">
             <label>{{ t("st.ctx") }}</label>
             <button class="emd-btn" @click="regMenu(true)">

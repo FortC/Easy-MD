@@ -110,10 +110,40 @@ md.renderer.rules.image = (tokens, idx) => {
   const alt = escAttr(tok.content || "");
   let src = rawSrc;
   if (!/^(https?:|emdasset:|data:|blob:)/i.test(rawSrc) && rawSrc) {
-    src = emdAssetUrl(rawSrc.startsWith("/") ? rawSrc.slice(1) : rawSrc);
+    src = emdAssetUrl(resolveImageSrc(rawSrc, CURRENT));
   }
   return `<img src="${escAttr(src)}" alt="${alt}" loading="lazy" />`;
 };
+
+/** 图片/相对资源目标 → vault 相对路径（裸文件名拼附件目录，./ ../ 相对当前笔记） */
+export function resolveImageSrc(rawSrc: string, opts: RenderOpts | null): string {
+  let t = rawSrc.trim().replace(/\\/g, "/");
+  try {
+    t = decodeURIComponent(t);
+  } catch {
+    /* 非法编码序列时保留原文 */
+  }
+  t = t.split("#")[0].split("?")[0];
+  if (!t || t === ".") return "";
+  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) {
+    // vault 根路径 / 显式相对当前笔记（./ ../）→ 归一化为 vault 相对
+    const parts = t.startsWith("/")
+      ? []
+      : (opts?.sourcePath || "").split("/").slice(0, -1);
+    for (const seg of t.split("/")) {
+      if (seg === "..") parts.pop();
+      else if (seg && seg !== ".") parts.push(seg);
+    }
+    return parts.join("/");
+  }
+  if (!t.includes("/")) {
+    // 裸文件名 → 附件目录（与 ![[ ]] 嵌入行为一致）
+    const dir =
+      (opts?.attachmentsDir || "").trim().replace(/^\/+|\/+$/g, "") || "assets";
+    return `${dir}/${t}`;
+  }
+  return t;
+}
 
 // ---------- 标题锚点 ----------
 md.renderer.rules.heading_open = (tokens, idx) => {
@@ -146,14 +176,16 @@ md.renderer.rules.emd_tag = (tokens, idx) => {
 };
 
 export function emdAssetUrl(relPath: string): string {
-  return `emdasset://vault/${encodeURIComponent(relPath)}`;
+  // 逐段编码：保留 / 分隔符，空格与中文按段编码，避免整串 encodeURIComponent 把 / 变成 %2F
+  const clean = relPath.replace(/\\/g, "/").replace(/^\/+/, "");
+  return `emdasset://vault/${clean.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 /** 渲染入口（同步渲染，嵌入内容由 PreviewView 异步填充） */
 export function renderMarkdown(content: string, opts: RenderOpts): string {
   CURRENT = opts;
   try {
-    const body = stripFrontmatter(content).body;
+    const body = fixLooseImageLinks(stripFrontmatter(content).body);
     let html = md.render(body);
     // 任务列表复选框
     html = html.replace(
@@ -168,6 +200,19 @@ export function renderMarkdown(content: string, opts: RenderOpts): string {
 }
 
 // ---------- 文本工具（与 Rust parser 行为对齐的 JS 版） ----------
+
+/**
+ * 宽容修复 ![alt](路径含空格)：CommonMark 裸目标不允许空格，markdown-it 会整段当纯文本
+ * （粘贴截图生成的 `![](assets/Pasted image ….png)` 即此形态），补上 <> 包裹即可恢复为图片。
+ * 含 " 或 <> 或括号的（合法标题写法 / 已修复形态）不动。
+ * 导出管线（lib/export.ts）同样需要，供其复用。
+ */
+export function fixLooseImageLinks(body: string): string {
+  return body.replace(
+    /!\[([^\]\n]*)\]\(([^()\n<>"']* [^()\n<>"']*)\)/g,
+    (_m, alt: string, dest: string) => `![${alt}](<${dest}>)`,
+  );
+}
 
 export function stripFrontmatter(text: string): { fm: string | null; body: string; bodyStartLine: number } {
   const t = text.startsWith("\u{feff}") ? text.slice(1) : text;

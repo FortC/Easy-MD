@@ -4,7 +4,7 @@ import { api, assetUrl } from "../ipc/tauri";
 import { useEditorStore } from "../stores/editor";
 import { useNotesIndexStore } from "../stores/notesIndex";
 import { useSettingsStore } from "../stores/settings";
-import { stripFrontmatter, slugify } from "./markdown/renderer";
+import { stripFrontmatter, slugify, fixLooseImageLinks } from "./markdown/renderer";
 import { resolveTarget } from "./markdown/links";
 import { tf } from "../i18n";
 
@@ -12,9 +12,10 @@ import { tf } from "../i18n";
 function renderExportMarkdown(content: string): string {
   const indexStore = useNotesIndexStore();
   const { body } = stripFrontmatter(content);
+  const src = fixLooseImageLinks(body);
 
   // 1) 嵌入 ![[...]]
-  let out = body.replace(/!\[\[([^\[\]\n]+)\]\]/g, (_m, inner: string) => {
+  let out = src.replace(/!\[\[([^\[\]\n]+)\]\]/g, (_m, inner: string) => {
     const [main] = inner.split("|");
     const target = main.split("#")[0].trim();
     return `%%EMBED::${target}%%`;

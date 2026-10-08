@@ -40,6 +40,8 @@ pub struct AppSettings {
     pub log_templates_dir: String,
     /// 选中的日志模板文件名（空 = 使用内置默认模板）
     pub log_template_name: String,
+    /// 外部文件（右键/双击打开）默认处理方式：ask = 每次询问 | vault | temp
+    pub os_open_mode: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -107,6 +109,7 @@ impl Default for AppSettings {
             log_template: String::new(),
             log_templates_dir: "log-templates".into(),
             log_template_name: String::new(),
+            os_open_mode: "ask".into(),
         }
     }
 }

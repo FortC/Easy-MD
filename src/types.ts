@@ -111,7 +111,11 @@ export interface AppSettings {
   log_template: string;
   log_templates_dir: string;
   log_template_name: string;
+  /** 外部文件（右键/双击打开）默认处理方式：ask = 每次询问 | vault | temp */
+  os_open_mode: OsOpenMode;
 }
+
+export type OsOpenMode = "ask" | "vault" | "temp";
 
 export const defaultSettings = (): AppSettings => ({
   theme: "dark",
@@ -135,6 +139,7 @@ export const defaultSettings = (): AppSettings => ({
   log_template: "",
   log_templates_dir: "log-templates",
   log_template_name: "",
+  os_open_mode: "ask",
 });
 
 /** vault-changed 事件载荷 */

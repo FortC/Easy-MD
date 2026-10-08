@@ -329,6 +329,10 @@ const dict: Record<string, [string, string]> = {
   "st.ctxUnreg": ["取消注册", "Unregister"],
   "st.ctxOk": ["已注册右键菜单", "Context menu registered"],
   "st.ctxRemoved": ["已取消注册", "Unregistered"],
+  "st.osOpen": ["右键打开文件时的动作", "Action when opening via right-click"],
+  "st.osAsk": ["每次询问", "Ask every time"],
+  "st.osVault": ["默认以知识库打开", "Open as vault by default"],
+  "st.osTemp": ["默认临时打开", "Open as temp by default"],
   "st.opFail": ["操作失败", "Operation failed"],
   "st.snippetDir": ["CSS 片段存放于：", "CSS snippets folder:"],
   "st.addSnippet": ["添加片段", "Add snippet"],
@@ -533,6 +537,7 @@ const dict: Record<string, [string, string]> = {
   // ---- 系统打开文件弹窗 ----
   "oc.title": ["选择打开方式", "Choose how to open"],
   "oc.file": ["文件", "File"],
+  "oc.remember": ["记住此选择，以后不再询问", "Remember my choice and don't ask again"],
   "oc.vault": ["以知识库打开", "Open as vault"],
   "oc.vaultDesc": ["文件所在目录将作为知识库，可直接编辑、建立双链", "The file's folder becomes the vault — edit and link freely"],
   "oc.temp": ["临时文件打开", "Open as temp file"],

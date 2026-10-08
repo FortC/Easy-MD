@@ -98,7 +98,7 @@ watch(
   },
 );
 
-/** 粘贴图片 → 存 assets → 插入 ![](路径) */
+/** 粘贴图片 → 存 assets → 插入 ![](<路径>)（<> 包裹以兼容带空格文件名） */
 async function onPaste(e: ClipboardEvent) {
   const items = e.clipboardData?.items;
   if (!items) return;
@@ -111,7 +111,7 @@ async function onPaste(e: ClipboardEvent) {
       try {
         const buf = await file.arrayBuffer();
         const rel = await api.saveImage(Array.from(new Uint8Array(buf)), ext);
-        insertAtCursor(`![](${rel})\n`);
+        insertAtCursor(`![](<${rel}>)\n`);
       } catch { /* 忽略 */ }
       return;
     }

@@ -384,7 +384,8 @@ const pasteHandler = EditorView.domEventHandlers({
           v.dispatch({
             changes: {
               from: v.state.selection.main.head,
-              insert: `![](${rel})`,
+              // <> 包裹：文件名带空格（Pasted image ….png）时裸目标不是合法链接语法
+              insert: `![](<${rel}>)`,
             },
           });
         });
