@@ -8,3 +8,4 @@ src-tauri/gen/schemas
 *.bak
 
 .easy-publish.json
+dist-release/

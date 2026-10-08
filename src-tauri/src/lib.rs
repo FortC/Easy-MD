@@ -104,9 +104,10 @@ fn serve_asset(app: &tauri::AppHandle, uri: &str) -> tauri::http::Response<Vec<u
             .unwrap()
     };
 
-    // emdasset://vault/<encoded-rel-path>
-    let rest = match uri.strip_prefix("emdasset://vault/") {
-        Some(r) => r,
+    // emdasset://vault/<encoded-rel-path>（scheme/host 大小写容错）
+    let uri_lower = uri.to_lowercase();
+    let rest = match uri_lower.strip_prefix("emdasset://vault/") {
+        Some(r) => &uri[uri.len() - r.len()..],
         None => return not_found(),
     };
     let rel = percent_encoding::percent_decode_str(rest)
@@ -144,9 +145,22 @@ fn serve_asset(app: &tauri::AppHandle, uri: &str) -> tauri::http::Response<Vec<u
         return not_found();
     }
 
-    let bytes = match std::fs::read(&full) {
-        Ok(b) => b,
-        Err(_) => return not_found(),
+    // 双重编码防御：webview 偶发把已编码 URL 再编码一次（% → %25），解码失败时重试
+    let mut bytes = std::fs::read(&full).ok();
+    if bytes.is_none() && rest.contains('%') {
+        let rel2 = percent_encoding::percent_decode_str(&rel)
+            .decode_utf8_lossy()
+            .to_string();
+        if !rel2.is_empty()
+            && !rel2.contains("..")
+            && !Path::new(&rel2).is_absolute()
+        {
+            bytes = std::fs::read(vc.root.join(rel2.replace('\\', "/"))).ok();
+        }
+    }
+    let bytes = match bytes {
+        Some(b) => b,
+        None => return not_found(),
     };
     let mime = mime_of(full.extension().and_then(|e| e.to_str()).unwrap_or(""));
     Response::builder()

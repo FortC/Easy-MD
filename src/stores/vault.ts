@@ -24,6 +24,7 @@ export const useVaultStore = defineStore("vault", {  state: () => ({
       this.root = root;
       this.opened = true;
       useNotesIndexStore().setNotes(notes);
+      useNotesIndexStore().refreshAssets();
       this.dirCache = {};
       this.expanded = {};
       this.loadDir("");
@@ -35,16 +36,19 @@ export const useVaultStore = defineStore("vault", {  state: () => ({
       this.opened = true;
       const notes = useNotesIndexStore();
       notes.setNotes(res.notes);
+      notes.refreshAssets();
       this.dirCache = {};
       this.expanded = {};
       await this.loadDir("");
       await this.loadVaultList();
     },
     async create(path: string) {
-      const res = await api.createVault(path);
+      const res: OpenVaultResult = await api.createVault(path);
       this.root = res.root;
       this.opened = true;
-      useNotesIndexStore().setNotes(res.notes as NoteIndex[]);
+      const notes = useNotesIndexStore();
+      notes.setNotes(res.notes as NoteIndex[]);
+      notes.refreshAssets();
       this.dirCache = {};
       this.expanded = {};
       await this.loadDir("");

@@ -31,6 +31,10 @@ pub struct VaultChangedPayload {
     pub canvas_changed: Vec<String>,
     /// 变化的 graph 文件（相对路径）
     pub graph_changed: Vec<String>,
+    /// 新增/修改的资源文件（相对路径，非 md/canvas/graph）——前端图片解析用
+    pub assets_added: Vec<String>,
+    /// 删除的资源文件（相对路径）
+    pub assets_removed: Vec<String>,
 }
 
 pub fn spawn(root: PathBuf, app: AppHandle) -> Result<WatcherHandle> {
@@ -78,6 +82,8 @@ fn handle_batch(app: &AppHandle, root: &std::path::Path, paths: HashSet<PathBuf>
         removed: vec![],
         canvas_changed: vec![],
         graph_changed: vec![],
+        assets_added: vec![],
+        assets_removed: vec![],
     };
     {
         let state = app.state::<AppState>();
@@ -99,7 +105,13 @@ fn handle_batch(app: &AppHandle, root: &std::path::Path, paths: HashSet<PathBuf>
             let is_canvas = rel.to_lowercase().ends_with(".canvas");
             let is_graph = rel.to_lowercase().ends_with(".graph");
             if !is_md && !is_canvas && !is_graph {
-                continue; // 资源文件变化不影响索引
+                // 资源文件不进索引，但推给前端维护图片解析注册表
+                if full.is_file() {
+                    payload.assets_added.push(rel);
+                } else {
+                    payload.assets_removed.push(rel);
+                }
+                continue;
             }
             if is_canvas {
                 payload.canvas_changed.push(rel);

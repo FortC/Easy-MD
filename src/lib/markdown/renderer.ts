@@ -9,6 +9,8 @@ export interface RenderOpts {
   attachmentsDir: string;
   /** 当前笔记相对路径（解析相对资源用） */
   sourcePath?: string;
+  /** vault 内全部资源文件路径（提供时按 Obsidian 行为做全库文件名解析） */
+  assetPaths?: string[];
 }
 
 const md: MarkdownIt = new MarkdownIt({ html: false, linkify: true, breaks: false });
@@ -115,7 +117,9 @@ md.renderer.rules.image = (tokens, idx) => {
   return `<img src="${escAttr(src)}" alt="${alt}" loading="lazy" />`;
 };
 
-/** 图片/相对资源目标 → vault 相对路径（裸文件名拼附件目录，./ ../ 相对当前笔记） */
+/** 图片/相对资源目标 → vault 相对路径。候选顺序（对齐 Obsidian）：
+ * 1. 按字面（vault 根相对）；2. 相对当前笔记目录；3. 裸文件名拼附件目录；
+ * 4. 以上都不在库中时，全库按文件名唯一匹配（同名取最短路径）。 */
 export function resolveImageSrc(rawSrc: string, opts: RenderOpts | null): string {
   let t = rawSrc.trim().replace(/\\/g, "/");
   try {
@@ -125,24 +129,75 @@ export function resolveImageSrc(rawSrc: string, opts: RenderOpts | null): string
   }
   t = t.split("#")[0].split("?")[0];
   if (!t || t === ".") return "";
-  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) {
-    // vault 根路径 / 显式相对当前笔记（./ ../）→ 归一化为 vault 相对
-    const parts = t.startsWith("/")
-      ? []
-      : (opts?.sourcePath || "").split("/").slice(0, -1);
-    for (const seg of t.split("/")) {
-      if (seg === "..") parts.pop();
-      else if (seg && seg !== ".") parts.push(seg);
+
+  const noteDir = (opts?.sourcePath || "").split("/").slice(0, -1);
+  const attachDir =
+    (opts?.attachmentsDir || "").trim().replace(/^\/+|\/+$/g, "") || "assets";
+
+  // 展开相对段（./ ../）并归一化
+  const expand = (parts: string[], base: string[]): string => {
+    const out = [...parts.filter((s) => s !== ".")];
+    for (const seg of base) out.push(seg);
+    const res: string[] = [];
+    for (const seg of out) {
+      if (seg === "..") res.pop();
+      else if (seg) res.push(seg);
     }
-    return parts.join("/");
+    return res.join("/");
+  };
+
+  const candidates: string[] = [];
+  if (t.startsWith("/")) {
+    candidates.push(expand(t.slice(1).split("/"), []));
+  } else if (t.startsWith("./") || t.startsWith("../")) {
+    candidates.push(expand(t.split("/"), noteDir));
+  } else if (t.includes("/")) {
+    candidates.push(expand(t.split("/"), []));
+    candidates.push(expand(t.split("/"), noteDir));
+  } else {
+    candidates.push(`${attachDir}/${t}`);
+    candidates.push(expand([t], noteDir));
   }
-  if (!t.includes("/")) {
-    // 裸文件名 → 附件目录（与 ![[ ]] 嵌入行为一致）
-    const dir =
-      (opts?.attachmentsDir || "").trim().replace(/^\/+|\/+$/g, "") || "assets";
-    return `${dir}/${t}`;
+
+  const index = assetIndexOf(opts?.assetPaths);
+  if (index) {
+    for (const c of candidates) {
+      const hit = index.byPath.get(c.toLowerCase());
+      if (hit) return hit;
+    }
+    // 全库按文件名唯一匹配（大小写不敏感；多同名取最短路径）
+    const name = t.split("/").pop()!.toLowerCase();
+    const hits = index.byName.get(name);
+    if (hits && hits.length > 0) {
+      return hits.reduce((a, b) => (a.length <= b.length ? a : b));
+    }
   }
-  return t;
+  return candidates[0] ?? t;
+}
+
+/** assetPaths 的查找索引（按数组引用缓存，渲染期间复用） */
+interface AssetIndex {
+  byPath: Map<string, string>;
+  byName: Map<string, string[]>;
+}
+const assetIndexCache = new WeakMap<string[], AssetIndex>();
+
+function assetIndexOf(paths?: string[]): AssetIndex | null {
+  if (!paths || paths.length === 0) return null;
+  let idx = assetIndexCache.get(paths);
+  if (!idx) {
+    idx = { byPath: new Map(), byName: new Map() };
+    for (const p of paths) {
+      const lower = p.toLowerCase();
+      if (!idx.byPath.has(lower)) idx.byPath.set(lower, p);
+      const name = lower.split("/").pop()!;
+      const arr = idx.byName.get(name);
+      if (arr) arr.push(p);
+      else idx.byName.set(name, [p]);
+    }
+    assetIndexCache.set(paths, idx);
+  }
+  return idx;
 }
 
 // ---------- 标题锚点 ----------

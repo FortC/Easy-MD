@@ -14,9 +14,10 @@ import {
   extractBlock,
   extractSection,
   renderMarkdown,
+  resolveImageSrc,
   slugify,
 } from "../../lib/markdown/renderer";
-import { isImageName, resolveAssetPath, resolveTarget } from "../../lib/markdown/links";
+import { isImageName, resolveTarget } from "../../lib/markdown/links";
 import { t } from "../../i18n";
 
 const editor = useEditorStore();
@@ -26,13 +27,18 @@ const ui = useUiStore();
 const previewEl = ref<HTMLElement>();
 const emit = defineEmits<{ jump: [target: { path?: string; anchor?: string; line?: number }] }>();
 
+/** 当前渲染上下文（html 与 fillEmbeds 共用） */
+const renderOpts = computed(() => ({
+  resolveNote: (tgt: string) => resolveTarget(tgt, indexStore.notes).path,
+  attachmentsDir: settings.data.attachments_dir,
+  sourcePath: editor.activePath,
+  // 访问 assetVersion 使 computed 依赖资源表版本（注册表更新后自动重渲染）
+  assetPaths: (indexStore.assetVersion, indexStore.assets),
+}));
+
 const html = computed(() => {
   if (!editor.activePath) return "";
-  return renderMarkdown(editor.content, {
-    resolveNote: (t) => resolveTarget(t, indexStore.notes).path,
-    attachmentsDir: settings.data.attachments_dir,
-    sourcePath: editor.activePath,
-  });
+  return renderMarkdown(editor.content, renderOpts.value);
 });
 
 watch(
@@ -46,13 +52,50 @@ watch(
   { immediate: false },
 );
 
+// 切换笔记时清理图片错误计数
+watch(
+  () => editor.activePath,
+  () => imgErrCount.clear(),
+);
+
 onMounted(async () => {
+  previewEl.value?.addEventListener("error", onImageError, true);
   if (previewEl.value && html.value) {
     previewEl.value.innerHTML = html.value;
     await fillEmbeds(previewEl.value, 0);
     handlePendingJump();
   }
 });
+
+onUnmounted(() => {
+  previewEl.value?.removeEventListener("error", onImageError, true);
+});
+
+// ---- 图片加载失败：首次刷新资源注册表重试，仍未命中显示占位 ----
+const imgErrCount = new Map<string, number>();
+
+function onImageError(ev: ErrorEvent) {
+  const el = ev.target as HTMLElement | null;
+  if (!(el instanceof HTMLImageElement) || !previewEl.value?.contains(el)) return;
+  const src = el.getAttribute("src") || "";
+  const count = (imgErrCount.get(src) || 0) + 1;
+  imgErrCount.set(src, count);
+  if (count === 1) {
+    // 图片可能是刚放进库的（粘贴/拖入/外部写入），注册表尚不知道 → 刷新后重渲染
+    indexStore.refreshAssets();
+    return;
+  }
+  let name = src;
+  try {
+    name = decodeURIComponent(src.split("/").pop() || src);
+  } catch {
+    /* 保留原文 */
+  }
+  const ph = document.createElement("div");
+  ph.className = "md-img-missing";
+  ph.textContent = `${t("pv.imgMissing")}  ${name}`;
+  el.replaceWith(ph);
+}
 
 // ---- 嵌入内容异步填充（![[ ]]） ----
 async function fillEmbeds(root: HTMLElement, depth: number) {
@@ -64,8 +107,9 @@ async function fillEmbeds(root: HTMLElement, depth: number) {
     if (!target && !sub) continue;
     try {
       if (isImageName(target)) {
-        const rel = resolveAssetPath(target, settings.data.attachments_dir, editor.activePath);
-        node.innerHTML = `<img src="${emdAssetUrl(rel)}" alt="${target}" />`;
+        const rel = resolveImageSrc(target, renderOpts.value);
+        const alt = target.replace(/"/g, "&quot;");
+        node.innerHTML = `<img src="${emdAssetUrl(rel)}" alt="${alt}" />`;
         continue;
       }
       const resolved = resolveTarget(target, indexStore.notes).path;
@@ -82,8 +126,7 @@ async function fillEmbeds(root: HTMLElement, depth: number) {
         body = extractSection(raw, sub);
       }
       const inner = renderMarkdown(body, {
-        resolveNote: (t) => resolveTarget(t, indexStore.notes).path,
-        attachmentsDir: settings.data.attachments_dir,
+        ...renderOpts.value,
         sourcePath: resolved,
       });
       const title = noteIndex?.title || target;
@@ -275,6 +318,23 @@ onUnmounted(() => {});
 .markdown-rendered img {
   max-width: 100%;
   border-radius: var(--radius-s);
+}
+.markdown-rendered .md-img-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--background-modifier-border-hover);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-size: 0.85em;
+  padding: 10px 14px;
+  margin: 0.3em 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
 }
 .markdown-rendered hr {
   border: none;

@@ -148,6 +148,10 @@ export interface VaultChangedPayload {
   removed: string[];
   canvas_changed: string[];
   graph_changed: string[];
+  /** 新增/修改的资源文件（vault 相对路径） */
+  assets_added: string[];
+  /** 删除的资源文件 */
+  assets_removed: string[];
 }
 
 /** .graph 图谱文件（JSON）模型 */

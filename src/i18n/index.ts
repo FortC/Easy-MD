@@ -173,6 +173,7 @@ const dict: Record<string, [string, string]> = {
   // ---- 预览 ----
   "pv.notFound": ["未找到笔记：{name}", "Note not found: {name}"],
   "pv.readFail": ["嵌入读取失败", "Failed to load embed"],
+  "pv.imgMissing": ["图片未找到：", "Image not found: "],
   "pv.createConfirm": ["笔记「{name}」不存在，是否创建？", 'Note "{name}" doesn\'t exist. Create it?'],
   "pv.self": ["同页链接", "Same-page link"],
 

@@ -74,9 +74,26 @@ async function inlineImages(html: string): Promise<string> {
   const urls = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = srcRe.exec(html))) urls.add(m[1]);
+  const indexStore = useNotesIndexStore();
+  const settings = useSettingsStore();
+  const { resolveImageSrc } = await import("./markdown/renderer");
+  const { useEditorStore } = await import("../stores/editor");
+  const editor = useEditorStore();
   for (const rel of urls) {
     try {
-      const resp = await fetch(assetUrl(decodeURIComponent(rel)));
+      let target = rel;
+      try {
+        target = decodeURIComponent(rel);
+      } catch {
+        /* 保留原文 */
+      }
+      const resolved = resolveImageSrc(target, {
+        resolveNote: () => null,
+        attachmentsDir: settings.data.attachments_dir,
+        sourcePath: editor.activePath,
+        assetPaths: indexStore.assets,
+      });
+      const resp = await fetch(assetUrl(resolved));
       const blob = await resp.blob();
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const fr = new FileReader();
