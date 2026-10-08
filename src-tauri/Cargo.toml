@@ -7,7 +7,9 @@ edition = "2021"
 
 [lib]
 name = "easymd_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# 仅桌面 Windows：cdylib 仅供移动端打包使用，且 rustc 在 windows-gnu 工具链下会为
+# cdylib 生成超过 PE 65535 导出符号上限的 .def 导致链接失败，故不构建
+crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
