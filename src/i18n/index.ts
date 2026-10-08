@@ -88,6 +88,7 @@ const dict: Record<string, [string, string]> = {
   "fe.canvas": ["画布", "Canvas"],
   "fe.folder": ["文件夹", "Folder"],
   "fe.import": ["导入", "Import"],
+  "fe.emptyVault": ["这个知识库还没有文件\n右键空白处也可新建", "This vault is empty\nRight-click to create"],
   "fe.newNote": ["新建笔记 (Ctrl+N)", "New note (Ctrl+N)"],
   "fe.newCanvas": ["新建画布", "New canvas"],
   "fe.newFolder": ["新建文件夹", "New folder"],

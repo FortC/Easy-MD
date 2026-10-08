@@ -2,6 +2,20 @@
   <div class="file-explorer" @contextmenu.prevent="showMenu($event, null)">
     <div class="fe-tree">
       <FileTree dir="" @menu="showMenu" @open="openNoteFile" />
+      <!-- 空库引导：目录为空时给出可点的入口，而不是一片空白 -->
+      <div v-if="rootEmpty" class="fe-empty">
+        <Icon name="folder-open" :size="28" />
+        <p>{{ t("fe.emptyVault") }}</p>
+        <button class="emd-btn" @click="ui.openNewNote()">
+          <Icon name="file-plus" :size="13" /> {{ t("fe.newNote") }}
+        </button>
+        <button class="emd-btn" @click="openFolderDialog(null)">
+          <Icon name="folder-plus" :size="13" /> {{ t("fe.newFolder") }}
+        </button>
+        <button class="emd-btn" @click="importHere(null)">
+          <Icon name="download" :size="13" /> {{ t("fe.import") }}
+        </button>
+      </div>
     </div>
 
     <!-- 右键菜单（通用下拉组件） -->
@@ -51,6 +65,9 @@ const ui = useUiStore();
 
 const multiSelected = ref(new Set<string>());
 
+/** 根目录为空（空库）：文件树无内容时显示引导 */
+const rootEmpty = computed(() => vault.dirCache[""]?.length === 0);
+
 const menu = reactive({
   visible: false,
   x: 0,
@@ -93,6 +110,7 @@ const menuItems = computed(() => {
     { key: "sep", label: "", separator: true },
     { key: "delete", label: t("fe.delete"), icon: "trash-2", danger: true },
   ];
+  return items;
 });
 
 const closeMenu = () => (menu.visible = false);
@@ -230,5 +248,20 @@ async function deleteEntry(e: FsEntry | null) {
   flex: 1;
   overflow-y: auto;
   padding: 4px 6px;
+}
+.fe-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 12px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  white-space: pre-line;
+}
+.fe-empty .emd-btn {
+  width: 100%;
+  justify-content: center;
 }
 </style>
