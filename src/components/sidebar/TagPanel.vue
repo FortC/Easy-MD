@@ -62,7 +62,7 @@ async function openNote(path: string) {
 </script>
 
 <style scoped>
-.tag-panel { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.tag-panel { flex: 1 1 0%; min-width: 0; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 .tp-list { flex: 1; overflow-y: auto; padding: 2px 6px; }
 .tp-item { gap: 8px; }
 .tp-icon { color: var(--text-accent); }

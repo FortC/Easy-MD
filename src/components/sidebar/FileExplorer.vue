@@ -239,6 +239,11 @@ async function deleteEntry(e: FsEntry | null) {
 
 <style scoped>
 .file-explorer {
+  /* ws-left 是 flex 容器：不设 flex:1 会被收缩成内容宽度，
+     右侧空白区域右键/点击都不归文件树管 */
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   height: 100%;

@@ -166,6 +166,9 @@ async function createJot() {
 
 <style scoped>
 .jot-panel {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
