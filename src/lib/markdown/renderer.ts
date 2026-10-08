@@ -233,7 +233,14 @@ md.renderer.rules.emd_tag = (tokens, idx) => {
 export function emdAssetUrl(relPath: string): string {
   // 逐段编码：保留 / 分隔符，空格与中文按段编码，避免整串 encodeURIComponent 把 / 变成 %2F
   const clean = relPath.replace(/\\/g, "/").replace(/^\/+/, "");
-  return `emdasset://vault/${clean.split("/").map(encodeURIComponent).join("/")}`;
+  const encoded = clean.split("/").map(encodeURIComponent).join("/");
+  // Windows/Android 的 WebView 不支持非标准 scheme 的页面内请求，Tauri 将自定义协议
+  // 映射为 http://<scheme>.localhost；其余平台用原生 scheme
+  const isWinLike =
+    /win/i.test(navigator.userAgent) || /android/i.test(navigator.userAgent);
+  return isWinLike
+    ? `http://emdasset.localhost/vault/${encoded}`
+    : `emdasset://vault/${encoded}`;
 }
 
 /** 渲染入口（同步渲染，嵌入内容由 PreviewView 异步填充） */

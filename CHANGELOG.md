@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-08
+
+### Fixed
+- **修复 Windows 下 vault 内图片始终无法显示的根本原因**：WebView2 不支持页面内发起非标准 scheme 请求——Tauri 2 在 Windows 上将自定义协议映射为 `http://<scheme>.localhost`，而前端此前一直用 `emdasset://` 原生 scheme，请求从未到达后端处理器。现在资源 URL 按 Windows/Android 走 `http://emdasset.localhost/vault/...`，其他平台保持原生 scheme；后端两种前缀均接受，CSP 同步放行。
+
 ## [0.3.2] - 2026-10-08
 
 ### Fixed

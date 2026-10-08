@@ -104,10 +104,14 @@ fn serve_asset(app: &tauri::AppHandle, uri: &str) -> tauri::http::Response<Vec<u
             .unwrap()
     };
 
-    // emdasset://vault/<encoded-rel-path>（scheme/host 大小写容错）
+    // Windows/Android：Tauri 将自定义协议映射为 http(s)://emdasset.localhost；
+    // 其他平台为 emdasset://localhost。两种前缀都接受（大小写容错）。
     let uri_lower = uri.to_lowercase();
-    let rest = match uri_lower.strip_prefix("emdasset://vault/") {
-        Some(r) => &uri[uri.len() - r.len()..],
+    let rest = match ["http://emdasset.localhost/vault/", "https://emdasset.localhost/vault/", "emdasset://localhost/vault/", "emdasset://vault/"]
+        .iter()
+        .find_map(|p| uri_lower.strip_prefix(p).map(|r| &uri[uri.len() - r.len()..]))
+    {
+        Some(r) => r,
         None => return not_found(),
     };
     let rel = percent_encoding::percent_decode_str(rest)

@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "EasyMD",
   "mainBinaryName": "EasyMD",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "identifier": "com.easymd.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -25,12 +25,14 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' emdasset: data: blob:; media-src 'self' emdasset: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost emdasset:"
+      "csp": "default-src 'self'; img-src 'self' emdasset: http://emdasset.localhost https://emdasset.localhost data: blob:; media-src 'self' emdasset: http://emdasset.localhost https://emdasset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost emdasset: http://emdasset.localhost https://emdasset.localhost"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,7 +42,9 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["SimpChinese"],
+        "languages": [
+          "SimpChinese"
+        ],
         "installMode": "currentUser",
         "displayLanguageSelector": false,
         "installerHooks": "./installer-hooks.nsh"
