@@ -55,6 +55,7 @@ import { useEditorStore } from "../../stores/editor";
 import { useNotesIndexStore } from "../../stores/notesIndex";
 import { useUiStore } from "../../stores/ui";
 import { api } from "../../ipc/tauri";
+import { copyText } from "../../lib/clipboard";
 import { t, tf } from "../../i18n";
 import type { FsEntry } from "../../types";
 
@@ -105,6 +106,9 @@ const menuItems = computed(() => {
     ];
   }
   const items: DropItem[] = [
+    { key: "copy-full", label: t("fe.copyFullPath"), icon: "copy" },
+    { key: "copy-rel", label: t("fe.copyRelPath"), icon: "copy" },
+    { key: "sep-p", label: "", separator: true },
     { key: "rename", label: t("fe.rename"), icon: "pencil" },
     { key: "duplicate", label: t("fe.duplicate"), icon: "copy" },
     { key: "sep", label: "", separator: true },
@@ -161,6 +165,15 @@ async function onMenuSelect(key: string) {
         } catch (err) { alert(String(err)); }
       }
       break;
+    case "copy-full":
+    case "copy-rel": {
+      if (!e) break;
+      const rel = e.path;
+      const full = `${vault.root.replace(/[\\/]+$/, "")}\\${rel.replace(/\//g, "\\")}`;
+      const ok = await copyText(key === "copy-full" ? full : rel);
+      if (!ok) alert(t("fe.copyFail"));
+      break;
+    }
     case "rename":
       dialog.mode = "rename";
       dialog.entry = e;

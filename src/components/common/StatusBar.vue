@@ -16,6 +16,23 @@
         <Icon name="link" :size="12" /> {{ tf("sb.backlinks", { n: backlinkCount }) }}
       </span>
       <span class="sb-item">{{ tf("sb.words", { n: editor.wordCount }) }}</span>
+      <button
+        v-if="fileEncoding"
+        ref="encBtn"
+        class="sb-item sb-enc"
+        title="文件编码，点击转换"
+        @click="encOpen = !encOpen"
+      >
+        {{ fileEncoding }}
+      </button>
+      <DropdownMenu
+        :open="encOpen"
+        :anchor="encBtn"
+        align="right"
+        :items="encItems"
+        @select="onEncSelect"
+        @close="encOpen = false"
+      />
       <span class="sb-item">{{ modeLabel }}</span>
       <span class="sb-item sb-ver" :title="`EasyMD v${appVersion} ${BUILD_ID}`">
         v{{ appVersion }} · {{ BUILD_ID }}
@@ -25,9 +42,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { getVersion } from "@tauri-apps/api/app";
 import Icon from "./Icon.vue";
+import DropdownMenu, { type DropItem } from "./DropdownMenu.vue";
 import { useEditorStore } from "../../stores/editor";
 import { useNotesIndexStore } from "../../stores/notesIndex";
 import { useSyncStore } from "../../stores/sync";
@@ -41,6 +59,46 @@ const sync = useSyncStore();
 const backlinkCount = ref(0);
 // 运行时读 tauri.conf.json 的版本号（build.ts 的静态常量仅作兜底）
 const appVersion = ref(APP_VERSION);
+
+// ---- 文件编码：检测显示 + 一键转换 ----
+const fileEncoding = ref("");
+const encOpen = ref(false);
+const encBtn = ref<HTMLElement>();
+const encItems = computed<DropItem[]>(() => [
+  { key: "to-utf8", label: t("sb.encToUtf8") },
+  { key: "to-gb", label: t("sb.encToGb") },
+]);
+
+async function refreshEncoding() {
+  if (!editor.activePath) {
+    fileEncoding.value = "";
+    return;
+  }
+  try {
+    fileEncoding.value = await api.detectFileEncoding(editor.activePath);
+  } catch {
+    fileEncoding.value = "";
+  }
+}
+
+watch(() => editor.activePath, refreshEncoding);
+
+async function onEncSelect(key: string) {
+  encOpen.value = false;
+  if (!editor.activePath) return;
+  const toGb = key === "to-gb";
+  const target = toGb ? "GB18030" : "UTF-8";
+  if (fileEncoding.value === target) return;
+  if (!confirm(t(toGb ? "sb.encGbConfirm" : "sb.encUtf8Confirm"))) return;
+  try {
+    // 写入当前编辑器内容（未保存的改动一并落盘），再重新加载同步状态
+    await api.writeTextFileAs(editor.activePath, editor.content, toGb ? "gb18030" : "utf-8");
+    await editor.openNote(editor.activePath);
+    await refreshEncoding();
+  } catch (e) {
+    alert(`${t("sb.encFail")}: ${e}`);
+  }
+}
 
 const modeLabel = computed(
   () =>
@@ -98,6 +156,16 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+.sb-enc {
+  cursor: pointer;
+  border-radius: var(--radius-s);
+  padding: 1px 6px;
+  transition: background var(--anim-fast), color var(--anim-fast);
+}
+.sb-enc:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 .sb-item {
   display: inline-flex;

@@ -52,6 +52,8 @@ pub fn run() {
             commands::vault::forget_vault,
             commands::fsops::read_text_file,
             commands::fsops::write_text_file,
+            commands::fsops::detect_file_encoding,
+            commands::fsops::write_text_file_as,
             commands::fsops::path_exists,
             commands::fsops::list_dir,
             commands::fsops::create_note,

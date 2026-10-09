@@ -27,6 +27,9 @@ export const api = {
   readTextFile: (path: string) => invoke<string>("read_text_file", { path }),
   writeTextFile: (path: string, content: string) =>
     invoke<void>("write_text_file", { path, content }),
+  detectFileEncoding: (path: string) => invoke<string>("detect_file_encoding", { path }),
+  writeTextFileAs: (path: string, content: string, encoding: string) =>
+    invoke<void>("write_text_file_as", { path, content, encoding }),
   pathExists: (path: string) => invoke<boolean>("path_exists", { path }),
   listDir: (path: string | null) => invoke<FsEntry[]>("list_dir", { path }),
   createNote: (folder: string | null, title: string, content?: string) =>

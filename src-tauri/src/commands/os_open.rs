@@ -68,6 +68,11 @@ pub fn open_path_from_os(
         .trim_start_matches('/')
         .to_string();
 
+    // 归一化为 Windows 反斜杠形式：与 VaultPicker 存的路径一致，
+    // 避免 touch_vault / last_vault / 缓存路径 因分隔符差异产生重复记录。
+    // rel 保持正斜杠（前端索引/文件树使用正斜杠相对路径）。
+    let root_str = root_str.replace('/', "\\");
+
     let res = super::vault::open_vault_inner(
         app,
         state.clone(),

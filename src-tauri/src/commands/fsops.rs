@@ -20,11 +20,67 @@ fn with_vault<T>(
 
 // ---------------- 读写 ----------------
 
+/// 智能解码：BOM 优先 → UTF-8 校验 → GB18030 兜底（中文环境最常见的非 UTF-8 编码）
+pub(crate) fn decode_bytes(bytes: &[u8]) -> (String, &'static str) {
+    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        if let Ok(s) = std::str::from_utf8(&bytes[3..]) {
+            return (s.to_string(), "UTF-8 BOM");
+        }
+    }
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        let (cow, _, _) = encoding_rs::UTF_16LE.decode(bytes);
+        return (cow.into_owned(), "UTF-16 LE");
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        let (cow, _, _) = encoding_rs::UTF_16BE.decode(bytes);
+        return (cow.into_owned(), "UTF-16 BE");
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(s) => (s.to_string(), "UTF-8"),
+        Err(_) => {
+            let (cow, _, had_errors) = encoding_rs::GB18030.decode(bytes);
+            (
+                cow.into_owned(),
+                if had_errors { "GB18030?" } else { "GB18030" },
+            )
+        }
+    }
+}
+
 #[tauri::command]
 pub fn read_text_file(state: State<'_, AppState>, path: String) -> Result<String, String> {
     with_vault(&state, |vc| {
         let full = vc.safe_join(&path).map_err(|e| e.to_string())?;
-        std::fs::read_to_string(&full).map_err(|e| format!("读取失败：{}", e))
+        let bytes = std::fs::read(&full).map_err(|e| format!("读取失败：{}", e))?;
+        Ok(decode_bytes(&bytes).0)
+    })
+}
+
+/// 检测文件编码（状态栏显示 / 转换前确认）
+#[tauri::command]
+pub fn detect_file_encoding(state: State<'_, AppState>, path: String) -> Result<String, String> {
+    with_vault(&state, |vc| {
+        let full = vc.safe_join(&path).map_err(|e| e.to_string())?;
+        let bytes = std::fs::read(&full).map_err(|e| format!("读取失败：{}", e))?;
+        Ok(decode_bytes(&bytes).1.to_string())
+    })
+}
+
+/// 以指定编码写盘（编码转换）：encoding = "utf-8" | "gb18030"
+#[tauri::command]
+pub fn write_text_file_as(
+    state: State<'_, AppState>,
+    path: String,
+    content: String,
+    encoding: String,
+) -> Result<(), String> {
+    with_vault(&state, |vc| {
+        let full = vc.safe_join(&path).map_err(|e| e.to_string())?;
+        let bytes = match encoding.to_lowercase().as_str() {
+            "gb18030" | "gbk" => encoding_rs::GB18030.encode(&content).0.into_owned(),
+            _ => content.into_bytes(),
+        };
+        std::fs::write(&full, bytes).map_err(|e| format!("写入失败：{}", e))
     })
 }
 
