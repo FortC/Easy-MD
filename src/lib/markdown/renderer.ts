@@ -13,7 +13,16 @@ export interface RenderOpts {
   assetPaths?: string[];
 }
 
-const md: MarkdownIt = new MarkdownIt({ html: false, linkify: true, breaks: false });
+// html:true 让论坛/网页复制来的原生 <img> 等 HTML 片段正常渲染
+// （VSCode/Obsidian 同为 true）；script 仍被 CSP script-src 'self' 阻断
+const md: MarkdownIt = new MarkdownIt({ html: true, linkify: true, breaks: false });
+
+// markdown-it 默认把 file: / data: 也当危险协议拒绝解析（链接/图片都不出），
+// 本地知识库需要 file:// 与 base64 图片；脚本安全由 CSP script-src 'self' 把关
+md.validateLink = (url: string) => {
+  const str = url.trim().toLowerCase();
+  return !/^(vbscript|javascript):/.test(str);
+};
 
 // ---------- wikilink / embed ----------
 md.inline.ruler.before("link", "emd_wikilink", (state, silent) => {
@@ -110,12 +119,62 @@ md.renderer.rules.image = (tokens, idx) => {
   const tok = tokens[idx];
   const rawSrc = tok.attrGet("src") || "";
   const alt = escAttr(tok.content || "");
-  let src = rawSrc;
-  if (!/^(https?:|emdasset:|data:|blob:)/i.test(rawSrc) && rawSrc) {
-    src = emdAssetUrl(resolveImageSrc(rawSrc, CURRENT));
-  }
+  const src = finalImgSrc(rawSrc, CURRENT);
   return `<img src="${escAttr(src)}" alt="${alt}" loading="lazy" />`;
 };
+
+/**
+ * 图片 src 最终定位（分类必须完整，否则网图/本地路径会被误当 vault 相对路径）：
+ * - 外链 http(s)/data/blob/emdasset：原样；
+ * - `//host/…`（协议相对）与裸域名（pic1.zhimg.com/…）：补 https:// 前缀；
+ * - `file://` / 盘符绝对路径 / UNC：统一为 file:/// URL（预览后置处理读文件转 blob）；
+ * - 其余（含裸文件名）：走 vault 全库解析 → emdasset。
+ */
+export function finalImgSrc(rawSrc: string, opts: RenderOpts | null): string {
+  const raw = rawSrc.trim();
+  if (!raw) return "";
+  // 分类前解码一次：%5C/%20 是 fixImageDests 为保护路径加的，识别本地路径需还原
+  let logical = raw;
+  try {
+    logical = decodeURIComponent(raw);
+  } catch {
+    /* 非法编码序列时保留原文 */
+  }
+  if (/^(https?:|data:|blob:|emdasset:)/i.test(logical)) return raw;
+  if (logical.startsWith("//")) return "https:" + raw;
+  if (/^(www\.|[a-z0-9-]+(?:\.[a-z0-9-]+){2,}\/)/i.test(logical)) return "https://" + raw;
+  if (/^(file:|[a-z]:[\\/]|\\\\)/i.test(logical)) return toFileUrl(logical);
+  return emdAssetUrl(resolveImageSrc(raw, opts));
+}
+
+/** 本地绝对路径 / file:// → 规范 file:/// URL（含空格/中文按段编码） */
+export function toFileUrl(p: string): string {
+  const s = p.trim();
+  if (/^file:/i.test(s)) return s;
+  const norm = s.replace(/\\/g, "/");
+  return (
+    "file:///" +
+    norm
+      .split("/")
+      .map((seg, i) => (i === 0 ? seg : encodeURIComponent(seg)))
+      .join("/")
+  );
+}
+
+/** file:/// URL → 本地路径（配合 read_external_binary 读取） */
+export function fileUrlToPath(u: string): string {
+  const s = u.replace(/^file:\/*/i, "");
+  return s
+    .split("/")
+    .map((seg) => {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    })
+    .join("/");
+}
 
 /** 图片/相对资源目标 → vault 相对路径。候选顺序（对齐 Obsidian）：
  * 1. 按字面（vault 根相对）；2. 相对当前笔记目录；3. 裸文件名拼附件目录；
@@ -247,7 +306,7 @@ export function emdAssetUrl(relPath: string): string {
 export function renderMarkdown(content: string, opts: RenderOpts): string {
   CURRENT = opts;
   try {
-    const body = fixLooseImageLinks(stripFrontmatter(content).body);
+    const body = fixImageDests(stripFrontmatter(content).body);
     let html = md.render(body);
     // 任务列表复选框
     html = html.replace(
@@ -264,15 +323,26 @@ export function renderMarkdown(content: string, opts: RenderOpts): string {
 // ---------- 文本工具（与 Rust parser 行为对齐的 JS 版） ----------
 
 /**
- * 宽容修复 ![alt](路径含空格)：CommonMark 裸目标不允许空格，markdown-it 会整段当纯文本
- * （粘贴截图生成的 `![](assets/Pasted image ….png)` 即此形态），补上 <> 包裹即可恢复为图片。
- * 含 " 或 <> 或括号的（合法标题写法 / 已修复形态）不动。
- * 导出管线（lib/export.ts）同样需要，供其复用。
+ * 图片目标预处理（渲染/导出共用）：
+ * 1. 编码裸反斜杠 → %5C：markdown 解析会吃掉 `\x` 形式的反斜杠，Windows 路径
+ *    （`![](C:\Users\…)`）不经保护会被毁掉；
+ * 2. 空格 → %20：CommonMark 裸目标不允许空格（粘贴截图 `Pasted image …`、
+ *    本地路径常见），否则整段不被解析成图片；
+ * 3. 含 " 或 <> 或括号的（合法标题写法）不动。
+ * 目标端（resolveImageSrc/fileUrlToPath）会 decodeURIComponent 还原。
  */
-export function fixLooseImageLinks(body: string): string {
+export function fixImageDests(body: string): string {
   return body.replace(
-    /!\[([^\]\n]*)\]\(([^()\n<>"']* [^()\n<>"']*)\)/g,
-    (_m, alt: string, dest: string) => `![${alt}](<${dest}>)`,
+    /!\[([^\]\n]*)\]\((<[^<>\n]*>|[^()\n<>"']*)\)/g,
+    (m: string, alt: string, destRaw: string) => {
+      const wrapped = destRaw.startsWith("<");
+      const dest = wrapped ? destRaw.slice(1, -1) : destRaw;
+      if (!dest) return m;
+      let out = dest;
+      if (out.includes("\\")) out = out.replace(/\\/g, "%5C");
+      if (/\s/.test(out)) out = out.replace(/ /g, "%20");
+      return out === dest && !wrapped ? m : `![${alt}](${out})`;
+    },
   );
 }
 

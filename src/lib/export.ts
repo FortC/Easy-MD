@@ -4,7 +4,7 @@ import { api, assetUrl } from "../ipc/tauri";
 import { useEditorStore } from "../stores/editor";
 import { useNotesIndexStore } from "../stores/notesIndex";
 import { useSettingsStore } from "../stores/settings";
-import { stripFrontmatter, slugify, fixLooseImageLinks } from "./markdown/renderer";
+import { stripFrontmatter, slugify, fixImageDests } from "./markdown/renderer";
 import { resolveTarget } from "./markdown/links";
 import { tf } from "../i18n";
 
@@ -12,7 +12,7 @@ import { tf } from "../i18n";
 function renderExportMarkdown(content: string): string {
   const indexStore = useNotesIndexStore();
   const { body } = stripFrontmatter(content);
-  const src = fixLooseImageLinks(body);
+  const src = fixImageDests(body);
 
   // 1) 嵌入 ![[...]]
   let out = src.replace(/!\[\[([^\[\]\n]+)\]\]/g, (_m, inner: string) => {
@@ -37,10 +37,12 @@ function renderExportMarkdown(content: string): string {
   return out;
 }
 
-/** markdown-it 实例（导出独立，避免预览插件副作用） */
+/** markdown-it 实例（导出独立，避免预览插件副作用）；html:true 与预览一致 */
 async function renderExportHtml(content: string): Promise<string> {
   const { default: MarkdownIt } = await import("markdown-it");
-  const md = new MarkdownIt({ html: false, linkify: true });
+  const md = new MarkdownIt({ html: true, linkify: true });
+  // 同预览：放行 file: / data:，仅拦脚本类协议
+  md.validateLink = (url: string) => !/^(vbscript|javascript):/i.test(url.trim());
   let html = md.render(renderExportMarkdown(content));
 
   // 嵌入内容替换（读取文件正文再渲染）
@@ -68,7 +70,7 @@ async function renderExportHtml(content: string): Promise<string> {
   return html;
 }
 
-/** 相对资源路径 → base64（单文件 html 内联） */
+/** 相对资源路径 → base64（单文件 html 内联）；file:// 本地图片同样内联 */
 async function inlineImages(html: string): Promise<string> {
   const srcRe = /src="(?!https?:|data:|blob:)([^"]+)"/g;
   const urls = new Set<string>();
@@ -76,37 +78,56 @@ async function inlineImages(html: string): Promise<string> {
   while ((m = srcRe.exec(html))) urls.add(m[1]);
   const indexStore = useNotesIndexStore();
   const settings = useSettingsStore();
-  const { resolveImageSrc } = await import("./markdown/renderer");
+  const { resolveImageSrc, fileUrlToPath } = await import("./markdown/renderer");
   const { useEditorStore } = await import("../stores/editor");
   const editor = useEditorStore();
+  const mimeOf = (p: string): string => {
+    const ext = p.split(".").pop()?.toLowerCase() || "";
+    return (
+      { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif" }[ext] ||
+      "application/octet-stream"
+    );
+  };
   for (const rel of urls) {
     try {
-      let target = rel;
-      try {
-        target = decodeURIComponent(rel);
-      } catch {
-        /* 保留原文 */
+      let dataUrl: string;
+      if (/^file:/i.test(rel)) {
+        // 本地绝对路径图片（file:/// 或盘符路径）：读文件内联
+        const bytes = await api.readExternalBinary(fileUrlToPath(rel));
+        const blob = new Blob([new Uint8Array(bytes)], { type: mimeOf(rel) });
+        dataUrl = await blobToDataUrl(blob);
+      } else {
+        let target = rel;
+        try {
+          target = decodeURIComponent(rel);
+        } catch {
+          /* 保留原文 */
+        }
+        const resolved = resolveImageSrc(target, {
+          resolveNote: () => null,
+          attachmentsDir: settings.data.attachments_dir,
+          sourcePath: editor.activePath,
+          assetPaths: indexStore.assets,
+        });
+        const resp = await fetch(assetUrl(resolved));
+        const blob = await resp.blob();
+        dataUrl = await blobToDataUrl(blob);
       }
-      const resolved = resolveImageSrc(target, {
-        resolveNote: () => null,
-        attachmentsDir: settings.data.attachments_dir,
-        sourcePath: editor.activePath,
-        assetPaths: indexStore.assets,
-      });
-      const resp = await fetch(assetUrl(resolved));
-      const blob = await resp.blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(fr.result as string);
-        fr.onerror = reject;
-        fr.readAsDataURL(blob);
-      });
       html = html.split(`src="${rel}"`).join(`src="${dataUrl}"`);
     } catch {
       /* 跳过失败资源 */
     }
   }
   return html;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
+  });
 }
 
 function exportCss(): string {

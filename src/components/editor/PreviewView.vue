@@ -13,6 +13,7 @@ import {
   emdAssetUrl,
   extractBlock,
   extractSection,
+  fileUrlToPath,
   renderMarkdown,
   resolveImageSrc,
   slugify,
@@ -47,6 +48,7 @@ watch(
     if (!previewEl.value) return;
     previewEl.value.innerHTML = html.value;
     await fillEmbeds(previewEl.value, 0);
+    await fixupRawImages(previewEl.value);
     handlePendingJump();
   },
   { immediate: false },
@@ -63,6 +65,7 @@ onMounted(async () => {
   if (previewEl.value && html.value) {
     previewEl.value.innerHTML = html.value;
     await fillEmbeds(previewEl.value, 0);
+    await fixupRawImages(previewEl.value);
     handlePendingJump();
   }
 });
@@ -71,6 +74,26 @@ onUnmounted(() => {
   previewEl.value?.removeEventListener("error", onImageError, true);
 });
 
+// ---- 原生 <img>（论坛/网页复制的 HTML 片段）后置修正 ----
+// markdown 语法图片已在渲染期改写；原生 <img> 直通到这里才处理：
+// 相对路径 → vault 解析；file:/// 与盘符路径 → 读文件转 blob URL
+async function fixupRawImages(root: HTMLElement) {
+  for (const img of Array.from(root.querySelectorAll("img"))) {
+    const src = img.getAttribute("src") || "";
+    if (!src) continue;
+    if (/^file:/i.test(src)) {
+      try {
+        const bytes = await api.readExternalBinary(fileUrlToPath(src));
+        img.src = URL.createObjectURL(new Blob([new Uint8Array(bytes)]));
+      } catch {
+        /* 读取失败交给 error 占位 */
+      }
+    } else if (!/^(https?:|data:|blob:|emdasset:)/i.test(src)) {
+      img.src = emdAssetUrl(resolveImageSrc(src, renderOpts.value));
+    }
+  }
+}
+
 // ---- 图片加载失败：首次刷新资源注册表重试，仍未命中显示占位 ----
 const imgErrCount = new Map<string, number>();
 
@@ -78,9 +101,10 @@ function onImageError(ev: ErrorEvent) {
   const el = ev.target as HTMLElement | null;
   if (!(el instanceof HTMLImageElement) || !previewEl.value?.contains(el)) return;
   const src = el.getAttribute("src") || "";
+  const isExternal = /^(https?:|file:)/i.test(src) || src.startsWith("//");
   const count = (imgErrCount.get(src) || 0) + 1;
   imgErrCount.set(src, count);
-  if (count === 1) {
+  if (count === 1 && !isExternal) {
     // 图片可能是刚放进库的（粘贴/拖入/外部写入），注册表尚不知道 → 刷新后重渲染
     indexStore.refreshAssets();
     return;
@@ -93,7 +117,7 @@ function onImageError(ev: ErrorEvent) {
   }
   const ph = document.createElement("div");
   ph.className = "md-img-missing";
-  ph.textContent = `${t("pv.imgMissing")}  ${name}`;
+  ph.textContent = `${isExternal ? t("pv.imgLoadFail") : t("pv.imgMissing")}  ${name}`;
   el.replaceWith(ph);
 }
 

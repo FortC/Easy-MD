@@ -178,6 +178,7 @@ const dict: Record<string, [string, string]> = {
   "pv.notFound": ["未找到笔记：{name}", "Note not found: {name}"],
   "pv.readFail": ["嵌入读取失败", "Failed to load embed"],
   "pv.imgMissing": ["图片未找到：", "Image not found: "],
+  "pv.imgLoadFail": ["图片加载失败（网络或防盗链）：", "Failed to load image (network/hotlink): "],
   "sb.encToUtf8": ["转换为 UTF-8", "Convert to UTF-8"],
   "sb.encToGb": ["转换为 GB18030（GBK 兼容）", "Convert to GB18030 (GBK compatible)"],
   "sb.encUtf8Confirm": ["将当前文件转换为 UTF-8 编码保存？（含未保存的修改）", "Convert this file to UTF-8? (including unsaved changes)"],
