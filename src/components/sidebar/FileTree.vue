@@ -7,7 +7,7 @@
         class="emd-tree-item ft-row"
         :style="{ paddingLeft: 6 + depth * 14 + 'px' }"
         @click="vault.toggleExpand(entry.path)"
-        @contextmenu.prevent="emitMenu($event, entry)"
+        @contextmenu.prevent.stop="emitMenu($event, entry)"
       >
         <Icon
           :name="vault.expanded[entry.path] ? 'chevron-down' : 'chevron-right'"
@@ -22,7 +22,7 @@
         :class="{ 'is-active': isActive(entry), 'is-multi-selected': multiSelected.has(entry.path) }"
         :style="{ paddingLeft: 6 + depth * 14 + 'px' }"
         @click="openEntry(entry, $event)"
-        @contextmenu.prevent="emitMenu($event, entry)"
+        @contextmenu.prevent.stop="emitMenu($event, entry)"
       >
         <Icon :name="iconFor(entry)" :size="14" class="ft-fileicon" />
         <span class="ft-name">{{ entry.name }}</span>

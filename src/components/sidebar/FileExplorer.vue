@@ -130,6 +130,8 @@ onMounted(() => {
 onUnmounted(() => window.removeEventListener("pointerdown", closeMenu));
 
 function showMenu(ev: MouseEvent, entry: FsEntry | null) {
+  // 防御：行内右键即使未来某处漏了 .stop 冒泡上来，也不能覆盖行菜单为空白菜单
+  if (!entry && (ev.target as HTMLElement | null)?.closest?.(".ft-row")) return;
   menu.x = ev.clientX;
   menu.y = ev.clientY;
   menu.entry = entry;
