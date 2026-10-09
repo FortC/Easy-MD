@@ -11,6 +11,7 @@ import { useSettingsStore } from "../../stores/settings";
 import { useUiStore } from "../../stores/ui";
 import {
   emdAssetUrl,
+  emdExternalUrl,
   extractBlock,
   extractSection,
   fileUrlToPath,
@@ -94,21 +95,49 @@ async function fixupRawImages(root: HTMLElement) {
   }
 }
 
-// ---- 图片加载失败：首次刷新资源注册表重试，仍未命中显示占位 ----
+// ---- 图片加载失败：外链走 Rust 代理下载（绕过 ORB/防盗链），库内刷新注册表重试 ----
 const imgErrCount = new Map<string, number>();
+// 外链代理缓存：原 URL → 本地 external 资源 URL（跨重渲染复用，避免重复下载）
+const extUrlCache = new Map<string, string>();
 
 function onImageError(ev: ErrorEvent) {
   const el = ev.target as HTMLElement | null;
   if (!(el instanceof HTMLImageElement) || !previewEl.value?.contains(el)) return;
   const src = el.getAttribute("src") || "";
-  const isExternal = /^(https?:|file:)/i.test(src) || src.startsWith("//");
+  const isHttp = /^https?:/i.test(src) && !/emdasset/i.test(src);
+  const isFile = /^file:/i.test(src);
+  const isExtCache = /emdasset[^/]*\/external\//i.test(src);
   const count = (imgErrCount.get(src) || 0) + 1;
   imgErrCount.set(src, count);
-  if (count === 1 && !isExternal) {
-    // 图片可能是刚放进库的（粘贴/拖入/外部写入），注册表尚不知道 → 刷新后重渲染
-    indexStore.refreshAssets();
-    return;
+  if (count === 1 && !isExtCache) {
+    if (isHttp) {
+      // 外链直连失败（ORB / 防盗链 / octet-stream）→ Rust 代理下载后指向本地缓存
+      const cached = extUrlCache.get(src);
+      if (cached) {
+        el.src = cached;
+        return;
+      }
+      api
+        .fetchExternalImage(src)
+        .catch(() => api.fetchExternalImage(src)) // 重试一次：并发同图竞争写缓存 / 瞬时网络抖动
+        .then((name) => {
+          const u = emdExternalUrl(name);
+          extUrlCache.set(src, u);
+          if (el.isConnected) el.src = u;
+        })
+        .catch(() => showImgPlaceholder(el, src, true));
+      return;
+    }
+    if (!isFile) {
+      // 库内图片可能是刚放进库的（粘贴/拖入/外部写入），注册表尚不知道 → 刷新后重渲染
+      indexStore.refreshAssets();
+      return;
+    }
   }
+  showImgPlaceholder(el, src, isHttp || isFile || isExtCache);
+}
+
+function showImgPlaceholder(el: HTMLImageElement, src: string, isExternal: boolean) {
   let name = src;
   try {
     name = decodeURIComponent(src.split("/").pop() || src);

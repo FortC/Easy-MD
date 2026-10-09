@@ -302,6 +302,16 @@ export function emdAssetUrl(relPath: string): string {
     : `emdasset://vault/${encoded}`;
 }
 
+/** 外链代理缓存资源名（external/<hash>.<ext>）→ 可加载 URL */
+export function emdExternalUrl(name: string): string {
+  const isWinLike =
+    /win/i.test(navigator.userAgent) || /android/i.test(navigator.userAgent);
+  const clean = name.replace(/\\/g, "/").replace(/^\/+/, "");
+  return isWinLike
+    ? `http://emdasset.localhost/${clean}`
+    : `emdasset://localhost/${clean}`;
+}
+
 /** 渲染入口（同步渲染，嵌入内容由 PreviewView 异步填充） */
 export function renderMarkdown(content: string, opts: RenderOpts): string {
   CURRENT = opts;

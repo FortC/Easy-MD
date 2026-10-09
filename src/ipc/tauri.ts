@@ -28,6 +28,7 @@ export const api = {
   writeTextFile: (path: string, content: string) =>
     invoke<void>("write_text_file", { path, content }),
   detectFileEncoding: (path: string) => invoke<string>("detect_file_encoding", { path }),
+  fetchExternalImage: (url: string) => invoke<string>("fetch_external_image", { url }),
   writeTextFileAs: (path: string, content: string, encoding: string) =>
     invoke<void>("write_text_file_as", { path, content, encoding }),
   pathExists: (path: string) => invoke<boolean>("path_exists", { path }),

@@ -1,6 +1,6 @@
 [package]
 name = "easymd"
-version = "0.4.3"
+version = "0.4.4"
 description = "EasyMD - 本地优先 Markdown 知识库"
 authors = ["easymd"]
 edition = "2021"

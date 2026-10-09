@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod extimg;
 pub mod fsops;
 pub mod index_cmd;
 pub mod mcp_cmd;

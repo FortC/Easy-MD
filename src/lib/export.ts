@@ -72,13 +72,13 @@ async function renderExportHtml(content: string): Promise<string> {
 
 /** 相对资源路径 → base64（单文件 html 内联）；file:// 本地图片同样内联 */
 async function inlineImages(html: string): Promise<string> {
-  const srcRe = /src="(?!https?:|data:|blob:)([^"]+)"/g;
+  const srcRe = /src="(?!data:|blob:)([^"]+)"/g;
   const urls = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = srcRe.exec(html))) urls.add(m[1]);
   const indexStore = useNotesIndexStore();
   const settings = useSettingsStore();
-  const { resolveImageSrc, fileUrlToPath } = await import("./markdown/renderer");
+  const { resolveImageSrc, fileUrlToPath, emdExternalUrl } = await import("./markdown/renderer");
   const { useEditorStore } = await import("../stores/editor");
   const editor = useEditorStore();
   const mimeOf = (p: string): string => {
@@ -91,10 +91,20 @@ async function inlineImages(html: string): Promise<string> {
   for (const rel of urls) {
     try {
       let dataUrl: string;
-      if (/^file:/i.test(rel)) {
+      if (/^https?:/i.test(rel) && !/emdasset/i.test(rel)) {
+        // 外链：ORB/防盗链环境下浏览器拉不到，走 Rust 代理下载再内联
+        const name = await api.fetchExternalImage(rel);
+        const resp = await fetch(emdExternalUrl(name));
+        const blob = await resp.blob();
+        dataUrl = await blobToDataUrl(blob);
+      } else if (/^file:/i.test(rel)) {
         // 本地绝对路径图片（file:/// 或盘符路径）：读文件内联
         const bytes = await api.readExternalBinary(fileUrlToPath(rel));
         const blob = new Blob([new Uint8Array(bytes)], { type: mimeOf(rel) });
+        dataUrl = await blobToDataUrl(blob);
+      } else if (/emdasset/i.test(rel)) {
+        const resp = await fetch(rel);
+        const blob = await resp.blob();
         dataUrl = await blobToDataUrl(blob);
       } else {
         let target = rel;

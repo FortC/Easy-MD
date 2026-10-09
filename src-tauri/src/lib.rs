@@ -88,6 +88,7 @@ pub fn run() {
             commands::os_open::open_default_apps_settings,
             commands::fsops::import_files,
             commands::fsops::read_external_binary,
+            commands::extimg::fetch_external_image,
             commands::fsops::list_all_files_with_mtime,
             commands::fsops::duplicate_file,
             commands::fsops::delete_files,
@@ -108,11 +109,48 @@ fn serve_asset(app: &tauri::AppHandle, uri: &str) -> tauri::http::Response<Vec<u
 
     // Windows/Android：Tauri 将自定义协议映射为 http(s)://emdasset.localhost；
     // 其他平台为 emdasset://localhost。两种前缀都接受（大小写容错）。
+    // 还原后的 URI 形如 emdasset://localhost/<vault|external>/…
     let uri_lower = uri.to_lowercase();
-    let rest = match ["http://emdasset.localhost/vault/", "https://emdasset.localhost/vault/", "emdasset://localhost/vault/", "emdasset://vault/"]
-        .iter()
-        .find_map(|p| uri_lower.strip_prefix(p).map(|r| &uri[uri.len() - r.len()..]))
+    let rest = match [
+        "http://emdasset.localhost/",
+        "https://emdasset.localhost/",
+        "emdasset://localhost/",
+        "emdasset://",
+    ]
+    .iter()
+    .find_map(|p| uri_lower.strip_prefix(p).map(|r| &uri[uri.len() - r.len()..]))
     {
+        Some(r) => r,
+        None => return not_found(),
+    };
+
+    // external/<hash>.<ext>：外链图片代理缓存（app 配置目录，不依赖 vault）
+    if let Some(name) = rest.strip_prefix("external/") {
+        let ok = !name.is_empty()
+            && !name.contains('/')
+            && !name.contains('\\')
+            && name.contains('.')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+        if !ok {
+            return not_found();
+        }
+        let full = crate::config::config_dir(app).join("external_cache").join(name);
+        return match std::fs::read(&full) {
+            Ok(b) => {
+                let mime = mime_of(name.rsplit('.').next().unwrap_or(""));
+                Response::builder()
+                    .header("Content-Type", mime)
+                    .header("Cache-Control", "max-age=86400")
+                    .body(b)
+                    .unwrap()
+            }
+            Err(_) => not_found(),
+        };
+    }
+
+    let rest = match rest.strip_prefix("vault/") {
         Some(r) => r,
         None => return not_found(),
     };
