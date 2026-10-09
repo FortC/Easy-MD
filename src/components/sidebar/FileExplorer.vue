@@ -1,7 +1,7 @@
 <template>
   <div class="file-explorer" @contextmenu.prevent="showMenu($event, null)">
     <div class="fe-tree">
-      <FileTree dir="" @menu="showMenu" @open="openNoteFile" />
+      <FileTree :key="vault.root" dir="" @menu="showMenu" @open="openNoteFile" />
       <!-- 空库引导：目录为空时给出可点的入口，而不是一片空白 -->
       <div v-if="rootEmpty" class="fe-empty">
         <Icon name="folder-open" :size="28" />
@@ -101,6 +101,9 @@ const menuItems = computed(() => {
       { key: "new-folder", label: t("fe.newFolder"), icon: "folder-plus" },
       { key: "sep-i", label: "", separator: true },
       { key: "import", label: t("fe.import"), icon: "download" },
+      { key: "sep-p", label: "", separator: true },
+      { key: "copy-full", label: t("fe.copyFullPath"), icon: "copy" },
+      { key: "copy-rel", label: t("fe.copyRelPath"), icon: "copy" },
       { key: "sep", label: "", separator: true },
       { key: "delete", label: t("fe.delete"), icon: "trash-2", danger: true },
     ];

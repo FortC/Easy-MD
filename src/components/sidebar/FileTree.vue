@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import Icon from "../common/Icon.vue";
 import { useVaultStore } from "../../stores/vault";
 import { useUiStore } from "../../stores/ui";
@@ -67,7 +67,8 @@ window.addEventListener("emd-multi-select-changed", ((e: CustomEvent<Set<string>
   multiSelected.value = e.detail;
 }) as EventListener);
 
-onMounted(async () => {
+/** 载入当前目录一层（切换库/目录内容变化时自动重载，避免残留上一个库的文件列表） */
+async function load() {
   let list = await vault.loadDir(props.dir);
   // 笔记树只展示笔记相关内容：隐藏小计目录与图谱文件（图谱在图谱模块里管理）
   if (props.dir === "" || props.dir === "jots" || props.dir === "daily") {
@@ -79,7 +80,14 @@ onMounted(async () => {
   }
   list = list.filter((e) => e.kind !== "graph");
   children.value = list;
-});
+}
+
+// 切换库（root 变化）或目录内容刷新（dirCache 更新）都重新载入
+watch(
+  () => [vault.root, vault.dirCache[props.dir]] as const,
+  () => load(),
+  { immediate: true },
+);
 
 function iconFor(e: FsEntry): string {
   if (e.kind === "md") return "file-text";

@@ -123,6 +123,14 @@ pub struct VaultEntry {
 
 // ---------------- 读写 ----------------
 
+/// Windows 路径归一化：统一反斜杠并去掉末尾分隔符。
+/// 同一文件夹用 `/` 与 `\` 两种写法时，库列表/索引缓存/last_vault 会各存一份，
+/// 表现为“文件树串库”，故所有路径入口都要过这里。
+pub fn normalize_path(p: &str) -> String {
+    let n = p.replace('/', "\\");
+    n.trim_end_matches('\\').to_string()
+}
+
 pub fn config_dir(app: &AppHandle) -> PathBuf {
     let dir = app
         .path()
@@ -166,7 +174,13 @@ pub fn save_settings(app: &AppHandle, settings: &AppSettings) {
 }
 
 pub fn load_vaults(app: &AppHandle) -> Vec<VaultEntry> {
-    read_json(&config_dir(app).join("vaults.json"), Vec::new())
+    let mut v: Vec<VaultEntry> =
+        read_json(&config_dir(app).join("vaults.json"), Vec::new());
+    // 历史数据里可能存有 `/` 混写路径，读取时归一化
+    for e in &mut v {
+        e.path = normalize_path(&e.path);
+    }
+    v
 }
 
 pub fn save_vaults(app: &AppHandle, vaults: &[VaultEntry]) {
@@ -175,8 +189,9 @@ pub fn save_vaults(app: &AppHandle, vaults: &[VaultEntry]) {
 
 /// 记录 vault 打开（新增或更新 last_opened）
 pub fn touch_vault(app: &AppHandle, path: &str) {
+    let path = normalize_path(path);
     let mut vaults = load_vaults(app);
-    let name = std::path::Path::new(path)
+    let name = std::path::Path::new(&path)
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| path.to_string());

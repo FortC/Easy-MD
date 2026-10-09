@@ -46,9 +46,12 @@ pub fn create_vault(
 pub(crate) fn open_vault_inner(
     app: AppHandle,
     state: State<'_, AppState>,
-    root: PathBuf,
+    _root: PathBuf,
     path: String,
 ) -> Result<OpenVaultResult, String> {
+    // 路径归一化（统一反斜杠）：同一文件夹不同分隔符写法必须是同一个库/同一份索引缓存
+    let path = config::normalize_path(&path);
+    let root = PathBuf::from(&path);
     let cache_path = IndexEngine::cache_path(&config::config_dir(&app), &root);
 
     // 关闭旧 vault 的监听
