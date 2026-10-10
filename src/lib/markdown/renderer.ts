@@ -264,11 +264,49 @@ md.renderer.rules.heading_open = (tokens, idx) => {
   const tok = tokens[idx];
   const inline = tokens[idx + 1];
   const slug = slugify(inline ? inline.content : "");
-  return `<${tok.tag} id="emd-h-${slug}" data-heading="${escAttr(inline ? inline.content : "")}">`;
+  if (tok.map) {
+    tok.attrSet("data-ls", String(tok.map[0] + LINE_OFFSET));
+    tok.attrSet("data-le", String(tok.map[1] + LINE_OFFSET));
+  }
+  const attrs = (tok.attrs || [])
+    .map(([k, v]) => ` ${k}="${escAttr(String(v))}"`)
+    .join("");
+  return `<${tok.tag}${attrs} id="emd-h-${slug}" data-heading="${escAttr(inline ? inline.content : "")}">`;
+};
+
+// ---------- 块级元素源行号锚点（分屏滚动同步定位用） ----------
+// 无自定义渲染规则的块级 token（段落/标题/列表/表格/引用/hr…）经 renderToken 输出，
+// 这里补上 data-ls / data-le（起始/结束源行，含 frontmatter 偏移）
+const renderTokenOrig = Object.getPrototypeOf(md.renderer).renderToken as NonNullable<typeof md.renderer.renderToken>;
+md.renderer.renderToken = function (tokens, idx, options) {
+  const token = tokens[idx];
+  if (token.map && token.nesting >= 0) {
+    token.attrSet("data-ls", String(token.map[0] + LINE_OFFSET));
+    token.attrSet("data-le", String(token.map[1] + LINE_OFFSET));
+  }
+  return renderTokenOrig.call(this, tokens, idx, options);
+};
+
+// 代码围栏有自带渲染规则（忽略 attrs），包一层把锚点注入 <pre>
+const fenceOrig = md.renderer.rules.fence;
+md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const html = (fenceOrig as NonNullable<typeof fenceOrig>).call(
+    md.renderer, tokens, idx, options, env, self,
+  );
+  if (token.map) {
+    return html.replace(
+      "<pre>",
+      `<pre data-ls="${token.map[0] + LINE_OFFSET}" data-le="${token.map[1] + LINE_OFFSET}">`,
+    );
+  }
+  return html;
 };
 
 // ---------- 默认规则绑定（渲染时机注入 resolve 上下文） ----------
 let CURRENT: RenderOpts | null = null;
+// 当前渲染正文的源行偏移（frontmatter 行数），块级元素行号锚点 = 源行 + 偏移
+let LINE_OFFSET = 0;
 
 md.renderer.rules.emd_wikilink = (tokens, idx) => {
   const { target, subpath, alias } = tokens[idx].meta;
@@ -316,7 +354,9 @@ export function emdExternalUrl(name: string): string {
 export function renderMarkdown(content: string, opts: RenderOpts): string {
   CURRENT = opts;
   try {
-    const body = fixImageDests(stripFrontmatter(content).body);
+    const fm = stripFrontmatter(content);
+    LINE_OFFSET = fm.bodyStartLine;
+    const body = fixImageDests(fm.body);
     let html = md.render(body);
     // 任务列表复选框
     html = html.replace(
@@ -365,7 +405,10 @@ export function stripFrontmatter(text: string): { fm: string | null; body: strin
     if (m && m.index !== undefined) {
       const fm = rest.slice(0, m.index);
       const body = rest.slice(m.index + m[0].length);
-      return { fm, body, bodyStartLine: fm.split("\n").length + 1 };
+      // 正文首行 = 前缀（含闭合 --- 及其后空行）内的换行数；
+      // 旧公式在闭合 --- 后跟空行时会少算一行
+      const bodyStartLine = (t.slice(0, nl + m.index + m[0].length).match(/\n/g) || []).length;
+      return { fm, body, bodyStartLine };
     }
   }
   return { fm: null, body: t, bodyStartLine: 0 };

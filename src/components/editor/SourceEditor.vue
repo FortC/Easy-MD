@@ -33,6 +33,7 @@ import { useEditorStore } from "../../stores/editor";
 import { useNotesIndexStore } from "../../stores/notesIndex";
 import { useAiStore } from "../../stores/ai";
 import { t, tf } from "../../i18n";
+import { clamp01, isScrollSyncLocked, lockScrollSync } from "../../lib/scrollSync";
 
 const host = ref<HTMLElement>();
 const wrapEl = ref<HTMLElement>();
@@ -425,9 +426,37 @@ function gotoLine(line: number) {
   view.focus();
 }
 
+// ---- 分屏滚动同步：编辑器侧 ----
+// 用户滚动编辑器 → 上报可视区顶部行（块内比例），预览按锚点对齐；
+// 接收预览的滚动定位（只滚动视口，不动光标/焦点）
+function onEditorScroll() {
+  const v = view;
+  if (!v || isScrollSyncLocked() || editor.mode !== "split") return;
+  const b = v.lineBlockAtHeight(v.scrollDOM.scrollTop);
+  const line = v.state.doc.lineAt(b.from);
+  const frac = clamp01((v.scrollDOM.scrollTop - b.top) / (b.height || 1));
+  window.dispatchEvent(
+    new CustomEvent("emd-scroll-source", { detail: { line: line.number - 1, frac } }),
+  );
+}
+
+function onScrollToLine(e: Event) {
+  const v = view;
+  if (!v) return;
+  const { line } = (e as CustomEvent<{ line: number }>).detail;
+  const doc = v.state.doc;
+  const li = Math.max(0, Math.min(doc.lines - 1, Math.floor(line)));
+  const f = clamp01(line - li);
+  const b1 = v.lineBlockAt(doc.line(li + 1).from);
+  const b2 = v.lineBlockAt(doc.line(Math.min(doc.lines, li + 2)).from);
+  lockScrollSync();
+  v.scrollDOM.scrollTop = b1.top + f * (b2.top - b1.top);
+}
+
 onMounted(() => {
   if (!host.value) return;
   view = new EditorView({ parent: host.value, state: makeState() });
+  view.scrollDOM.addEventListener("scroll", onEditorScroll);
 
   // 容器尺寸变化（拖窗口/拖分屏分隔条）后强制重新测量，避免留白
   const ro = new ResizeObserver(() => view?.requestMeasure());
@@ -437,16 +466,29 @@ onMounted(() => {
   // 大纲/搜索跳转到某行
   const onGoto = (e: Event) => gotoLine((e as CustomEvent<number>).detail);
   window.addEventListener("emd-goto-line", onGoto);
+  window.addEventListener("emd-scroll-to-line", onScrollToLine);
+  window.addEventListener("emd-scroll-preview", onScrollToLine);
   window.addEventListener("emd-format", onFormatEvent);
   window.addEventListener("emd-insert-text", onInsertText);
   window.addEventListener("emd-replace-selection", onReplaceSelection);
   onUnmounted(() => {
+    view?.scrollDOM.removeEventListener("scroll", onEditorScroll);
     window.removeEventListener("emd-goto-line", onGoto);
+    window.removeEventListener("emd-scroll-to-line", onScrollToLine);
+    window.removeEventListener("emd-scroll-preview", onScrollToLine);
     window.removeEventListener("emd-format", onFormatEvent);
     window.removeEventListener("emd-insert-text", onInsertText);
     window.removeEventListener("emd-replace-selection", onReplaceSelection);
   });
 });
+
+// 切到分屏时，把预览对齐到编辑器当前可视位置
+watch(
+  () => editor.mode,
+  (m) => {
+    if (m === "split") setTimeout(onEditorScroll, 80);
+  },
+);
 
 onUnmounted(() => {
   view?.destroy();

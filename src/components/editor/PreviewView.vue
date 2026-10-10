@@ -21,6 +21,7 @@ import {
 } from "../../lib/markdown/renderer";
 import { isImageName, resolveTarget } from "../../lib/markdown/links";
 import { t } from "../../i18n";
+import { clamp01, isScrollSyncLocked, lockScrollSync } from "../../lib/scrollSync";
 
 const editor = useEditorStore();
 const indexStore = useNotesIndexStore();
@@ -47,9 +48,12 @@ watch(
   html,
   async () => {
     if (!previewEl.value) return;
+    // 重渲染（打字时的实时刷新）保持可视区顶部对应的源行不变，避免预览跳顶
+    const keepLine = previewTopLine();
     previewEl.value.innerHTML = html.value;
     await fillEmbeds(previewEl.value, 0);
     await fixupRawImages(previewEl.value);
+    scrollToLine(keepLine);
     handlePendingJump();
   },
   { immediate: false },
@@ -61,8 +65,17 @@ watch(
   () => imgErrCount.clear(),
 );
 
+// 接收编辑器滚动上报 → 预览按锚点对齐（分屏滚动同步）
+function onSourceScroll(e: Event) {
+  if (isScrollSyncLocked() || editor.mode !== "split") return;
+  const { line, frac } = (e as CustomEvent<{ line: number; frac: number }>).detail;
+  scrollToLine(line + frac);
+}
+
 onMounted(async () => {
   previewEl.value?.addEventListener("error", onImageError, true);
+  previewEl.value?.addEventListener("scroll", onPreviewScroll);
+  window.addEventListener("emd-scroll-source", onSourceScroll);
   if (previewEl.value && html.value) {
     previewEl.value.innerHTML = html.value;
     await fillEmbeds(previewEl.value, 0);
@@ -73,7 +86,76 @@ onMounted(async () => {
 
 onUnmounted(() => {
   previewEl.value?.removeEventListener("error", onImageError, true);
+  previewEl.value?.removeEventListener("scroll", onPreviewScroll);
+  window.removeEventListener("emd-scroll-source", onSourceScroll);
 });
+
+// ---- 分屏滚动同步：预览侧 ----
+// 元素相对预览内容顶部的偏移（getBoundingClientRect 差值 + scrollTop，稳定于滚动）
+function contentTop(root: HTMLElement, el: HTMLElement): number {
+  return el.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop;
+}
+
+/** 可视区顶部对应的源行（可在锚点块内按比例取小数） */
+function previewTopLine(): number {
+  const root = previewEl.value;
+  if (!root) return 0;
+  const y = root.scrollTop + 8;
+  let top: HTMLElement | null = null;
+  let next: HTMLElement | null = null;
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>("[data-ls]"))) {
+    if (contentTop(root, el) <= y) top = el;
+    else {
+      next = el;
+      break;
+    }
+  }
+  if (!top) return 0;
+  const ls = Number(top.dataset.ls);
+  const le = Number(top.dataset.le);
+  if (next) {
+    const span = Math.max(1, contentTop(root, next) - contentTop(root, top));
+    const t = clamp01((y - contentTop(root, top)) / span);
+    return ls + t * Math.max(0, Number(next.dataset.ls) - ls);
+  }
+  const f = clamp01((y - contentTop(root, top)) / Math.max(1, top.offsetHeight));
+  return ls + f * Math.max(1, le - 1 - ls);
+}
+
+/** 滚动预览，使源行 line 对齐到可视区顶部 */
+function scrollToLine(line: number) {
+  const root = previewEl.value;
+  if (!root) return;
+  const blocks = root.querySelectorAll<HTMLElement>("[data-ls]");
+  if (!blocks.length) return;
+  let top: HTMLElement | null = null;
+  let next: HTMLElement | null = null;
+  for (const el of Array.from(blocks)) {
+    if (Number(el.dataset.ls) <= line) top = el;
+    else {
+      next = el;
+      break;
+    }
+  }
+  if (!top) {
+    lockScrollSync();
+    root.scrollTop = 0;
+    return;
+  }
+  let target = contentTop(root, top) - 8;
+  if (next) {
+    const span = Math.max(1, Number(next.dataset.ls) - Number(top.dataset.ls));
+    const t = clamp01((line - Number(top.dataset.ls)) / span);
+    target = contentTop(root, top) + t * (contentTop(root, next) - contentTop(root, top)) - 8;
+  }
+  lockScrollSync();
+  root.scrollTop = Math.max(0, target);
+}
+
+function onPreviewScroll() {
+  if (isScrollSyncLocked() || editor.mode !== "split") return;
+  window.dispatchEvent(new CustomEvent("emd-scroll-preview", { detail: { line: previewTopLine() } }));
+}
 
 // ---- 原生 <img>（论坛/网页复制的 HTML 片段）后置修正 ----
 // markdown 语法图片已在渲染期改写；原生 <img> 直通到这里才处理：
